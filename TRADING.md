@@ -116,7 +116,7 @@ trading/
 | Phase | What | Status |
 |-------|------|--------|
 | 1 | Deep analysis + architecture docs | ✅ Done |
-| 2 | Bug fixes + test coverage (MATRIX + SIGMA) | 🔧 In progress |
+| 2 | Bug fixes + test coverage (MATRIX + SIGMA) | ✅ Done — 12/12 interop tests, 7 bugs fixed |
 | 3 | Hard risk gates (AEGIS) | 📋 Planned |
 | 4 | Execution engine (VELOCITY) | 📋 Planned |
 | 5 | Portfolio management (ARCANE) | 📋 Planned |
@@ -130,14 +130,14 @@ trading/
 
 | ID | Bug | Severity | Status |
 |----|-----|----------|--------|
-| B1 | `get_insider_transactions` not in `TOOLS_CATEGORIES` | 🔴 Critical | Open |
-| B2 | LLM call counter doubled in StatsCallbackHandler | 🟠 Medium | Open |
-| B3 | Global news stops after first query hits limit | 🟠 Medium | Open |
-| B4 | Alpha Vantage historical data truncated | 🟠 Medium | Open |
-| B5 | Fundamentals always uses quick-think LLM | 🟢 Low | Open |
-| B6 | Sentiment analyst dead ToolNode | 🟢 Low | Open |
-| B7 | Multiple `print()` in production code | 🟢 Low | Open |
-| B8 | Polymarket `_request` returns `dict` but API can return `list` | 🟠 Medium | Open |
+| B1 | `get_insider_transactions` not in `TOOLS_CATEGORIES` | 🔴 Critical | ✅ Fixed |
+| B2 | LLM call counter doubled in StatsCallbackHandler | 🟠 Medium | ✅ Fixed |
+| B3 | Global news stops after first query hits limit | 🟠 Medium | ✅ Fixed |
+| B4 | Alpha Vantage historical data truncated | 🟠 Medium | ✅ Fixed |
+| B5 | Fundamentals always uses quick-think LLM | 🟢 Low | ✅ Fixed |
+| B6 | Sentiment analyst dead ToolNode | 🟢 Low | ✅ Fixed |
+| B7 | Multiple `print()` in production code | 🟢 Low | ✅ Fixed |
+| B8 | Polymarket return type mismatch | 🟠 Medium | ✅ Fixed |
 
 ---
 

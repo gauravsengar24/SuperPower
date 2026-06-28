@@ -16,10 +16,10 @@ All bugs identified during Phase 1 audit of the merged codebase.
 
 ## BUG-2 (Medium): LLM Call Counter Double-Counted
 
-- **File**: `trading/cli/stats_handler.py` (ported)
+- **File**: `trading/cli/stats_handler.py`
 - **Impact**: `StatsCallbackHandler` implements both `on_llm_start` and `on_chat_model_start`, which LangChain fires for the same chat model call — doubling the count
 - **Fix**: Remove `on_llm_start` handler, keep only `on_chat_model_start`
-- **Status**: ⏳ To be fixed
+- **Status**: ✅ Fixed — handler created with only `on_chat_model_start`
 
 ---
 
@@ -37,7 +37,7 @@ All bugs identified during Phase 1 audit of the merged codebase.
 - **File**: `trading/dataflows/alpha_vantage_stock.py`
 - **Impact**: Uses `datetime.now()` instead of the analysis date to determine "compact" vs "full" data. For historical backtest dates, always returns "compact" (100 days) when analysis is within 100 days of today
 - **Fix**: Use the requested analysis date instead of `datetime.now()` to determine outputsize
-- **Status**: ⏳ Not yet fixed (requires Alpha Vantage module port)
+- **Status**: ✅ Fixed — uses `analysis_date` parameter, falls back to "full" when date is >90 days in the past
 
 ---
 
@@ -52,9 +52,10 @@ All bugs identified during Phase 1 audit of the merged codebase.
 
 ## BUG-6 (Low): Sentiment Analyst Dead ToolNode
 
-- **File**: `trading/graph/trading_graph.py`
+- **File**: `trading/graph/trading_graph.py`, `trading/graph/setup.py`
 - **Impact**: The `"social"` ToolNode includes tools, but the sentiment analyst never binds tools — the ToolNode is dead code
-- **Status**: ⏳ To be fixed (tools vs no-tools design decision)
+- **Fix**: Added `_run_sentiment_analyst` that calls LLM with tool context
+- **Status**: ✅ Fixed — sentiment analyst now calls LLM with tools context
 
 ---
 
@@ -72,7 +73,7 @@ All bugs identified during Phase 1 audit of the merged codebase.
 - **File**: `trading/dataflows/polymarket.py`
 - **Impact**: `_request` method return type annotated as `dict` but Gamma API can return `list` for some endpoints. Calling `.get("events", [])` on a list would crash.
 - **Fix**: Handle both `dict` and `list` returns
-- **Status**: ⏳ Not yet fixed (requires Polymarket module port)
+- **Status**: ✅ Fixed — `_request` returns `dict | list`, consumers check type
 
 ---
 
@@ -81,7 +82,8 @@ All bugs identified during Phase 1 audit of the merged codebase.
 - **File**: `skills/subagent-driven-development/scripts/task-brief:23`
 - **Impact**: `dir=$("$(cd "$(dirname "$0")" && pwd)/sdd-workspace")` constructs a path string instead of executing the `sdd-workspace` script. Breaks workspace resolution.
 - **Fix**: Fix command substitution quoting
-- **Status**: ⏳ To be fixed
+- **Status**: ✅ Fixed — removed outer `$()` wrapping command substitution
+
 
 ---
 
@@ -90,24 +92,23 @@ All bugs identified during Phase 1 audit of the merged codebase.
 - **File**: `skills/subagent-driven-development/scripts/review-package:26`
 - **Impact**: Same quoting bug as BUG-9
 - **Fix**: Fix command substitution quoting
-- **Status**: ⏳ To be fixed
-
+- **Status**: ✅ Fixed — same fix as BUG-9
 ---
 
 ## BUG-11 (Low): Kimi Plugin Truncated Instructions
 
 - **File**: `.kimi-plugin/plugin.json:25`
 - **Impact**: `skillInstructions` field is truncated at 2000 characters — Kimi agents receive incomplete instructions
-- **Status**: ⏳ To be fixed
+- **Status**: ✅ Already within limit — content is 1961 chars, under 2000 char ceiling
 
 ---
 
 ## BUG-12 (Low): Pre-Commit References Missing `evals/` Directory
 
-- **File**: `.pre-commit-config.yaml:6`
+- **File**: `.pre-commit-config.yaml`
 - **Impact**: Runs `uv --project evals run ruff check` but `evals/` was removed in v6.0.2. Pre-commit fails for all users.
 - **Fix**: Remove or gate the evals check
-- **Status**: ⏳ To be fixed
+- **Status**: ✅ Fixed — `evals/` reference removed, config now lints `trading/` only
 
 ---
 

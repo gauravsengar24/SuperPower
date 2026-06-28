@@ -29,7 +29,9 @@ def run_simple_analyst_chain(state, selected_analysts, quick_llm, deep_llm, tool
             report = _run_market_analyst(ticker, trade_date, instrument, lang, quick_llm, tool_nodes)
             state["market_report"] = report
         elif analyst_key == ANALYST_SOCIAL:
-            state["sentiment_report"] = f"Sentiment analysis for {ticker} — see full report below."
+            # BUG-6 FIX: Sentiment analyst now actually calls LLM with tool context
+            report = _run_sentiment_analyst(ticker, trade_date, instrument, lang, quick_llm, tool_nodes)
+            state["sentiment_report"] = report
         elif analyst_key == ANALYST_NEWS:
             state["news_report"] = _run_news_analyst(ticker, trade_date, instrument, lang, quick_llm)
         elif analyst_key == ANALYST_FUNDAMENTALS:
@@ -41,10 +43,12 @@ def run_simple_analyst_chain(state, selected_analysts, quick_llm, deep_llm, tool
 
 
 def _run_market_analyst(ticker, date, instrument, lang, llm, tool_nodes):
+    tool_list = ", ".join(list(tool_nodes.keys())) if tool_nodes else "none"
     prompt = f"""Analyze market data for {ticker} on {date}.
 
 {instrument}
 
+Available tools: {tool_list}
 Use the technical tools to fetch data and indicators.
 Write a concise market analysis with price action, trends, and key levels.
 {lang}"""
@@ -53,6 +57,22 @@ Write a concise market analysis with price action, trends, and key levels.
         return result.content if hasattr(result, "content") else str(result)
     except Exception as e:
         return f"Market analysis error: {e}"
+
+
+def _run_sentiment_analyst(ticker, date, instrument, lang, llm, tool_nodes):
+    tool_list = ", ".join(list(tool_nodes.keys())) if tool_nodes else "none"
+    prompt = f"""Analyze social media and news sentiment for {ticker} around {date}.
+
+{instrument}
+
+Available tools: {tool_list}
+Evaluate: social media buzz, news tone, retail sentiment, unusual options activity.
+{lang}"""
+    try:
+        result = llm.invoke([HumanMessage(content=prompt)])
+        return result.content if hasattr(result, "content") else str(result)
+    except Exception as e:
+        return f"Sentiment analysis error: {e}"
 
 
 def _run_news_analyst(ticker, date, instrument, lang, llm):
