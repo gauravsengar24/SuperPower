@@ -160,16 +160,37 @@ def render_backtest():
             path = results_dir / selected
             try:
                 data = json.loads(path.read_text())
+                steps = data.get("steps", [])
                 equity = data.get("equity_curve", [])
                 trades = data.get("trades", [])
+                if not equity and steps:
+                    equity = [data.get("initial_cash", 100000)] + [s.get("portfolio_value", 0) for s in steps]
+                if not trades and steps:
+                    trades = [s.get("trade", {}) for s in steps if s.get("trade", {}).get("action") in ("buy", "sell")]
                 if equity:
                     metrics = compute_metrics(equity)
-                    trade_met = compute_trade_metrics(trades)
-                    st.markdown("**Metrics**")
+                    trade_met = compute_trade_metrics(trades) if trades else {"num_trades": 0, "win_rate": 0, "profit_factor": 0, "total_pnl": 0, "avg_win": 0, "avg_loss": 0}
+                    st.markdown(f"**{data.get('ticker', '?')}** — {data.get('start_date', '?')} → {data.get('end_date', '?')}")
                     cols = st.columns(4)
-                    for col, (k, v) in zip(cols, list(metrics.items())[:4]):
+                    items = [
+                        ("Return", metrics.get("total_return_pct", "?")),
+                        ("CAGR", metrics.get("cagr_pct", "?")),
+                        ("Sharpe", metrics.get("sharpe_ratio", "?")),
+                        ("Max DD", metrics.get("max_drawdown_pct", "?")),
+                    ]
+                    for col, (label, val) in zip(cols, items):
                         with col:
-                            st.metric(k.replace("_", " ").title(), v)
+                            st.metric(label, val)
+                    cols2 = st.columns(4)
+                    items2 = [
+                        ("Trades", trade_met.get("num_trades", 0)),
+                        ("Win Rate", f'{trade_met.get("win_rate", 0)}%'),
+                        ("Profit Factor", trade_met.get("profit_factor", 0)),
+                        ("Final Value", f'${metrics.get("final_value", 0):,.0f}'),
+                    ]
+                    for col, (label, val) in zip(cols2, items2):
+                        with col:
+                            st.metric(label, val)
                     if len(equity) > 1:
                         df = pd.DataFrame({"equity": equity})
                         st.line_chart(df)

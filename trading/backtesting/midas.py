@@ -59,6 +59,8 @@ class BacktestResult:
             "end_date": self.end_date,
             "initial_cash": self.initial_cash,
             "steps": [s.to_dict() for s in self.steps],
+            "equity_curve": self.equity_curve,
+            "trades": self.trades,
         }
 
     @property
