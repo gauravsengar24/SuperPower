@@ -7,12 +7,13 @@ and backtest results in a single-pane glassmorphism UI.
 import json
 import os
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
 import streamlit as st
 import pandas as pd
+import yfinance as yf
 
 from trading.monitoring.trend import TREND
 from trading.portfolio.arcane import ARCANE
@@ -190,6 +191,35 @@ def _detect_available_providers() -> list[tuple[str, str]]:
     return providers
 
 
+def _fetch_ticker_snapshot(ticker: str) -> str:
+    """Fetch recent price + volume data for a ticker. Returns a formatted string or empty on failure."""
+    try:
+        t = yf.Ticker(ticker)
+        hist = t.history(period="1mo")
+        if hist.empty:
+            return ""
+        last = hist.iloc[-1]
+        prev = hist.iloc[-2] if len(hist) > 1 else last
+        first = hist.iloc[0]
+        change_1d = last["Close"] - prev["Close"]
+        change_1d_pct = (change_1d / prev["Close"]) * 100
+        change_1m_pct = ((last["Close"] - first["Close"]) / first["Close"]) * 100
+        high_1m = hist["High"].max()
+        low_1m = hist["Low"].min()
+        avg_vol = hist["Volume"].mean()
+        return (
+            f"Price: ${last['Close']:.2f}  |  "
+            f"1d: {change_1d_pct:+.2f}% ({change_1d:+.2f})  |  "
+            f"1m: {change_1m_pct:+.2f}%\n"
+            f"1m High: ${high_1m:.2f}  |  "
+            f"1m Low: ${low_1m:.2f}\n"
+            f"Volume: {last['Volume']:,.0f}  |  "
+            f"Avg Volume (1m): {avg_vol:,.0f}"
+        )
+    except Exception:
+        return ""
+
+
 def render_quick_analysis(trend: TREND):
     st.subheader("Quick Analysis")
     if not HAS_LLM:
@@ -242,13 +272,16 @@ def render_quick_analysis(trend: TREND):
     if run and ticker.strip():
         provider, model = provider_opts[prov_choice]
         start = time.time()
+        with st.spinner(f"Fetching data for {ticker.upper()}..."):
+            snapshot = _fetch_ticker_snapshot(ticker)
         with st.spinner(f"Analyzing {ticker.upper()} via {provider}..."):
             try:
                 client = create_llm_client(provider=provider, model=model)
                 llm = client.get_llm()
+                data_block = f"\nLive market data:\n{snapshot}\n" if snapshot else ""
                 prompt = (
                     f"You are a professional stock analyst. Analyze {ticker.upper()} "
-                    f"as of {datetime.now().strftime('%Y-%m-%d')}. "
+                    f"as of {datetime.now().strftime('%Y-%m-%d')}.{data_block}"
                     f"Provide a concise summary covering: 1) Recent price action, "
                     f"2) Key support/resistance levels, 3) Bull case, 4) Bear case, "
                     f"5) Overall signal (STRONG BUY / BUY / HOLD / SELL / STRONG SELL). "
@@ -267,6 +300,9 @@ def render_quick_analysis(trend: TREND):
                     token_count=token_count,
                 )
                 st.success(f"Analysis complete ({duration_ms}ms, {token_count} tokens)")
+                if snapshot:
+                    st.markdown("**Live Data**")
+                    st.code(snapshot)
                 st.markdown(f"**{ticker.upper()} Analysis**")
                 st.markdown(text)
             except Exception as e:
