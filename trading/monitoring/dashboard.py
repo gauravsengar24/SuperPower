@@ -250,6 +250,32 @@ def render_backtest():
                 st.error(f"Failed to load backtest result: {e}")
 
 
+def render_live_trading():
+    st.subheader("Live Trading")
+    state_path = Path("~/.trading/live_state.json").expanduser()
+    if not state_path.exists():
+        st.info("No live trading data. Run `trading run AAPL` to start.")
+        return
+    try:
+        data = json.loads(state_path.read_text())
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Portfolio Value", f"${data.get('portfolio_value', 0):,.0f}")
+        with col2:
+            st.metric("Cash", f"${data.get('cash', 0):,.0f}")
+        with col3:
+            st.metric("Orders Filled", data.get("orders", 0))
+        positions = data.get("positions", [])
+        if positions:
+            st.markdown("**Positions**")
+            pos_data = pd.DataFrame(positions)
+            st.dataframe(pos_data, use_container_width=True)
+        else:
+            st.info("No open positions")
+    except Exception as e:
+        st.error(f"Failed to load live state: {e}")
+
+
 def _detect_available_providers() -> list[tuple[str, str]]:
     providers = []
     if os.environ.get("OPENAI_API_KEY"):
@@ -447,11 +473,13 @@ def run_dashboard(host: str = "0.0.0.0", port: int = 8501):
         st.divider()
         st.markdown("### Quickstart")
         st.code("trading analyze AAPL")
+        st.code("trading run AAPL --loop")
         st.code("trading backtest AAPL --from 2020-01-01  # defaults to present")
         st.markdown("[GitHub](https://github.com/gauravsengar24/SuperPower) • [Docs](https://github.com/gauravsengar24/SuperPower/blob/main/TRADING.md)")
 
     sections = [
         ("Quick Analysis", lambda: render_quick_analysis(trend)),
+        ("Live Trading", lambda: render_live_trading()),
         ("Provider Health", lambda: render_provider_health(trend)),
         ("Portfolio", lambda: render_portfolio(arcane)),
         ("Backtest Viewer", lambda: render_backtest()),

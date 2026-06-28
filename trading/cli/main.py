@@ -3,11 +3,13 @@
 Usage:
     trading analyze --ticker AAPL --date 2026-01-15
     trading dashboard
+    trading run AAPL --loop
     trading backtest --ticker AAPL --from 2020-01-01  # --to defaults to today
     trading portfolio
     trading --help
 """
 
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -154,6 +156,97 @@ def dashboard(
     console.print(f"[bold]T.R.E.N.D. Dashboard:[/bold] http://{host}:{port}")
     from trading.monitoring.dashboard import run_dashboard
     run_dashboard(host=host, port=port)
+
+
+@cli.command()
+def run(
+    ticker: str = typer.Argument(..., help="Ticker to trade"),
+    cash: float = typer.Option(10_000.0, "--cash", "-c", help="Initial cash"),
+    loop: bool = typer.Option(False, "--loop", "-l", help="Run in continuous loop"),
+    interval: int = typer.Option(3600, "--interval", "-i", help="Loop interval in seconds"),
+    side: str = typer.Option("auto", "--side", "-s", help="Force side: auto/buy/sell/hold"),
+    qty: int = typer.Option(0, "--qty", "-q", help="Quantity (0 = auto from risk)"),
+):
+    """Run the VELOCITY trading engine — analyze + execute a trade for a ticker.
+
+    Uses the paper broker (no real money). Runs AEGIS risk gates before each trade.
+    Use --loop for continuous trading every N seconds.
+    """
+    from trading.broker.paper import HermesPaperBroker
+    from trading.execution.velocity import VELOCITY
+    from trading.risk.aegis import AEGIS, PortfolioState as AEGISPortfolio, MarketSnapshot
+    from trading.portfolio.arcane import PortfolioState
+    import yfinance as yf
+    import time as time_mod
+
+    broker = HermesPaperBroker(initial_cash=cash)
+    aegis = AEGIS()
+    velocity = VELOCITY(broker=broker, aegis=aegis, paper_mode=True)
+    state_path = Path("~/.trading/live_state.json").expanduser()
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def _save_state():
+        acct = broker.get_account()
+        positions = broker.get_positions()
+        data = {
+            "cash": acct.cash,
+            "portfolio_value": acct.portfolio_value,
+            "positions": [{"ticker": p.ticker, "qty": p.qty, "avg_price": p.avg_entry_price, "value": p.market_value, "pnl": p.unrealized_pnl} for p in positions],
+            "orders": len(broker.filled_orders),
+        }
+        state_path.write_text(json.dumps(data, indent=2))
+
+    def _trade():
+        console.print(f"\n[bold]VELOCITY Trade:[/bold] {ticker} @ {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        try:
+            df = yf.download(ticker, period="5d", progress=False)
+            if df.empty:
+                console.print("[red]No price data[/red]")
+                return
+            price = float(df["Close"].iloc[-1])
+            broker.update_price(ticker, price)
+            console.print(f"  Price: ${price:.2f}")
+
+            # Determine signal
+            trade_side = side.lower()
+            if trade_side == "auto":
+                sma_20 = float(df["Close"].tail(20).mean()) if len(df) >= 20 else price
+                sma_50 = float(df["Close"].tail(50).mean()) if len(df) >= 50 else price
+                trade_side = "buy" if sma_20 > sma_50 else "sell" if sma_20 < sma_50 else "hold"
+                console.print(f"  Signal: SMA20={sma_20:.2f} SMA50={sma_50:.2f} → {trade_side.upper()}")
+
+            if trade_side == "hold":
+                console.print("  [yellow]HOLD — no trade[/yellow]")
+                _save_state()
+                return
+
+            trade_qty = qty or max(1, int((cash * 0.5) / price))
+            result = velocity.execute(ticker, side=trade_side, qty=trade_qty, order_type="market")
+            _save_state()
+
+            if result.success:
+                console.print(f"  [green]EXECUTED: {trade_side.upper()} {trade_qty} {ticker} @ ${result.order.avg_fill_price:.2f}[/green]")
+            else:
+                console.print(f"  [red]FAILED: {result.message}[/red]")
+
+            acct = broker.get_account()
+            console.print(f"  Portfolio: ${acct.portfolio_value:,.2f} | Cash: ${acct.cash:,.2f}")
+            positions = broker.get_positions()
+            if positions:
+                for p in positions:
+                    console.print(f"    {p.ticker}: {p.qty} @ ${p.avg_entry_price:.2f} (${p.unrealized_pnl:+,.2f})")
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+
+    _trade()
+    if loop:
+        console.print(f"\n[dim]Looping every {interval}s... Ctrl+C to stop[/dim]")
+        try:
+            while True:
+                time_mod.sleep(interval)
+                _trade()
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Stopped[/yellow]")
 
 
 @cli.command()
