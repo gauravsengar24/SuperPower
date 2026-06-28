@@ -50,6 +50,7 @@ def create_llm_client(provider: str, model: str, base_url: str | None = None,
 
 
 def _resolve_provider(provider: str) -> str:
+    provider = provider.lower().strip()
     if provider in OPENAI_COMPATIBLE_PROVIDERS:
         return "openai"
     return provider

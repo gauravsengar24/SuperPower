@@ -114,20 +114,20 @@ All bugs identified during Phase 1 audit of the merged codebase.
 
 ## Testing Gaps
 
-| Area | Coverage | Target |
-|------|----------|--------|
-| Agent logic (all 14 agents) | 0% | ≥80% |
-| Graph setup and edges | 0% | ≥80% |
-| Vendor routing | 0% | ≥80% |
-| LLM client creation | 0% | ≥80% |
-| CLI interactive flow | 0% | ≥60% |
-| Alpha Vantage dataflows | 0% | ≥70% |
-| StockTwits + Reddit dataflows | 0% | ≥70% |
-| AEGIS risk gates | ✅ Newly written | ≥90% |
-| Hermes paper broker | ✅ Newly written | ≥90% |
-| ARCANE portfolio | ✅ Newly written | ≥90% |
-| Signal processing | ✅ Newly written | ≥95% |
-| VELOCITY execution | ✅ Newly written | ≥90% |
+| Area | Tests | Target | Status |
+|------|-------|--------|--------|
+| Agent logic (sentiment, news, fundamentals, researcher, trader, risk mgr, portfolio mgr) | 32 | ≥80% | ✅ 32 tests written |
+| Graph setup and edges | 6 | ≥80% | ✅ 6 tests written |
+| Vendor routing | 0 | ≥80% | 📋 Planned (StockTwits, Reddit, FRED) |
+| LLM client creation | 11 | ≥80% | ✅ 11 tests written |
+| CLI interactive flow | 0 | ≥60% | 📋 Planned |
+| Alpha Vantage dataflows | 3 | ≥70% | ✅ 3 tests (in interop suite) |
+| StockTwits + Reddit dataflows | 0 | ≥70% | 📋 Planned (not ported) |
+| AEGIS risk gates | 8 | ≥90% | ✅ Written |
+| Hermes paper broker | 6 | ≥90% | ✅ Written |
+| ARCANE portfolio | 6 | ≥90% | ✅ Written |
+| Signal processing | 10 | ≥95% | ✅ Written |
+| VELOCITY execution | 2 | ≥90% | ✅ Written |
 
 ---
 

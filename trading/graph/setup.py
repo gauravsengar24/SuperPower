@@ -1,16 +1,11 @@
-"""Simple sequential analyst chain — runs analysts one at a time, aggregates reports."""
+"""Multi-stage pipeline: analysts → researcher → trader → risk manager → decision."""
 
 import logging
-from datetime import datetime
-from typing import Any
-
-from langchain_core.messages import HumanMessage, SystemMessage
 
 from trading.agents.utils.agent_utils import get_instrument_context_from_state, get_language_instruction
 
 logger = logging.getLogger(__name__)
 
-# BUG FIX: Analyst names as constants
 ANALYST_MARKET = "market"
 ANALYST_SOCIAL = "social"
 ANALYST_NEWS = "news"
@@ -18,117 +13,57 @@ ANALYST_FUNDAMENTALS = "fundamentals"
 
 
 def run_simple_analyst_chain(state, selected_analysts, quick_llm, deep_llm, tool_nodes):
-    """Run analysts in sequence, each building on previous reports."""
-    trade_date = state.get("trade_date", datetime.now().strftime("%Y-%m-%d"))
+    """Run analysts in sequence, then research → trade → risk → decision."""
+    trade_date = state.get("trade_date", "")
     ticker = state.get("company_of_interest", "UNKNOWN")
     instrument = get_instrument_context_from_state(state)
     lang = get_language_instruction(state.get("config", {}))
 
     for analyst_key in selected_analysts:
         if analyst_key == ANALYST_MARKET:
-            report = _run_market_analyst(ticker, trade_date, instrument, lang, quick_llm, tool_nodes)
+            from trading.agents.analysts.market_analyst import run_market_analyst
+            report = run_market_analyst(ticker, trade_date, instrument, lang, quick_llm, tool_nodes)
             state["market_report"] = report
         elif analyst_key == ANALYST_SOCIAL:
-            # BUG-6 FIX: Sentiment analyst now actually calls LLM with tool context
-            report = _run_sentiment_analyst(ticker, trade_date, instrument, lang, quick_llm, tool_nodes)
-            state["sentiment_report"] = report
+            from trading.agents.analysts.sentiment_analyst import run_sentiment_analyst
+            report = run_sentiment_analyst(ticker, trade_date, instrument, lang, quick_llm, tool_nodes)
+            state["sentiment_report"] = str(report)
         elif analyst_key == ANALYST_NEWS:
-            state["news_report"] = _run_news_analyst(ticker, trade_date, instrument, lang, quick_llm)
+            from trading.agents.analysts.news_analyst import run_news_analyst
+            report = run_news_analyst(ticker, trade_date, instrument, lang, quick_llm)
+            state["news_report"] = report
         elif analyst_key == ANALYST_FUNDAMENTALS:
-            # BUG FIX: Fundamentals uses DEEP LLM for complex analysis
-            state["fundamentals_report"] = _run_fundamentals_analyst(ticker, instrument, lang, deep_llm)
+            from trading.agents.analysts.fundamentals_analyst import run_fundamentals_analyst
+            report = run_fundamentals_analyst(ticker, instrument, lang, deep_llm)
+            state["fundamentals_report"] = report
 
-    state["final_trade_decision"] = _make_final_decision(state, ticker, lang, deep_llm)
+    from trading.agents.researchers.risk_researcher import run_researcher
+    research_plan = run_researcher(
+        ticker, instrument, lang, deep_llm,
+        market_report=state.get("market_report", ""),
+        sentiment_report=state.get("sentiment_report", ""),
+        news_report=state.get("news_report", ""),
+        fundamentals_report=state.get("fundamentals_report", ""),
+    )
+    state["investment_plan"] = research_plan
+
+    from trading.agents.trader.trader import run_trader
+    trader_proposal = run_trader(
+        ticker, instrument, lang, quick_llm,
+        research_plan=research_plan,
+        market_report=state.get("market_report", ""),
+        sentiment_report=state.get("sentiment_report", ""),
+    )
+    state["trader_investment_plan"] = trader_proposal
+
+    from trading.agents.risk_mgmt.risk_manager import run_risk_manager
+    config = state.get("config", {})
+    portfolio_decision = run_risk_manager(
+        ticker, trader_proposal=trader_proposal,
+        aegis_config=config,
+    )
+    state["final_trade_decision"] = (
+        "APPROVED" if portfolio_decision.approved else "REJECTED"
+    )
+
     return state
-
-
-def _run_market_analyst(ticker, date, instrument, lang, llm, tool_nodes):
-    tool_list = ", ".join(list(tool_nodes.keys())) if tool_nodes else "none"
-    prompt = f"""Analyze market data for {ticker} on {date}.
-
-{instrument}
-
-Available tools: {tool_list}
-Use the technical tools to fetch data and indicators.
-Write a concise market analysis with price action, trends, and key levels.
-{lang}"""
-    try:
-        result = llm.invoke([HumanMessage(content=prompt)])
-        return result.content if hasattr(result, "content") else str(result)
-    except Exception as e:
-        return f"Market analysis error: {e}"
-
-
-def _run_sentiment_analyst(ticker, date, instrument, lang, llm, tool_nodes):
-    tool_list = ", ".join(list(tool_nodes.keys())) if tool_nodes else "none"
-    prompt = f"""Analyze social media and news sentiment for {ticker} around {date}.
-
-{instrument}
-
-Available tools: {tool_list}
-Evaluate: social media buzz, news tone, retail sentiment, unusual options activity.
-{lang}"""
-    try:
-        result = llm.invoke([HumanMessage(content=prompt)])
-        return result.content if hasattr(result, "content") else str(result)
-    except Exception as e:
-        return f"Sentiment analysis error: {e}"
-
-
-def _run_news_analyst(ticker, date, instrument, lang, llm):
-    prompt = f"""Analyze news and macro factors for {ticker} around {date}.
-
-{instrument}
-
-Consider: recent news, macro conditions, insider transactions.
-{lang}"""
-    try:
-        result = llm.invoke([HumanMessage(content=prompt)])
-        return result.content if hasattr(result, "content") else str(result)
-    except Exception as e:
-        return f"News analysis error: {e}"
-
-
-def _run_fundamentals_analyst(ticker, instrument, lang, llm):
-    prompt = f"""Perform deep fundamental analysis of {ticker}.
-
-{instrument}
-
-Evaluate: financial health, growth metrics, valuation, competitive position.
-This requires deep reasoning — take your time.
-{lang}"""
-    try:
-        result = llm.invoke([HumanMessage(content=prompt)])
-        return result.content if hasattr(result, "content") else str(result)
-    except Exception as e:
-        return f"Fundamentals analysis error: {e}"
-
-
-def _make_final_decision(state, ticker, lang, llm):
-    mr = state.get("market_report", "")
-    sr = state.get("sentiment_report", "")
-    nr = state.get("news_report", "")
-    fr = state.get("fundamentals_report", "")
-
-    prompt = f"""Based on the following analysis for {ticker}, make a FINAL TRADE DECISION.
-
-MARKET ANALYSIS:
-{mr[:2000]}
-
-SENTIMENT ANALYSIS:
-{sr[:1000]}
-
-NEWS ANALYSIS:
-{nr[:2000]}
-
-FUNDAMENTALS ANALYSIS:
-{fr[:2000]}
-
-Output exactly: STRONG BUY | BUY | HOLD | SELL | STRONG SELL
-Then provide 1-2 sentence reasoning.
-{lang}"""
-    try:
-        result = llm.invoke([HumanMessage(content=prompt)])
-        return result.content if hasattr(result, "content") else str(result)
-    except Exception as e:
-        return f"HOLD — Analysis error: {e}"

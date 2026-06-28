@@ -117,12 +117,13 @@ trading/
 |-------|------|--------|
 | 1 | Deep analysis + architecture docs | ✅ Done |
 | 2 | Bug fixes + test coverage (MATRIX + SIGMA) | ✅ Done — 12/12 interop tests, 7 bugs fixed |
-| 3 | Hard risk gates (AEGIS) | 📋 Planned |
-| 4 | Execution engine (VELOCITY) | 📋 Planned |
-| 5 | Portfolio management (ARCANE) | 📋 Planned |
+| 3 | Hard risk gates (AEGIS) | ✅ Done — 5 gates in chain-of-responsibility |
+| 4 | Execution engine (VELOCITY) | ✅ Done — paper + Alpaca adapters |
+| 5 | Portfolio management (ARCANE) | ✅ Done — P&L, positions, metrics |
 | 6 | Backtesting (MIDAS) | 📋 Planned |
-| 7 | Dashboard + monitoring (JANUS) | 📋 Planned |
-| 8 | SuperPower trading skills | 📋 Planned |
+| 7 | Dashboard + monitoring (JANUS) | ✅ Done — provider fallback + drift detection |
+| 8 | Agent modules + test coverage | ✅ Done — 7 agent modules, 47 new tests (98 total) |
+| 9 | SuperPower trading skills | 📋 Planned |
 
 ---
 

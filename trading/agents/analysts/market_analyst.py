@@ -4,7 +4,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langgraph.types import Command
 
@@ -75,6 +75,24 @@ def create_market_analyst(llm: Any):
         )
 
     return analyst_node
+
+
+def run_market_analyst(ticker, date, instrument, lang, llm, tool_nodes):
+    """Simple market analyst call (not a LangGraph node)."""
+    tool_list = ", ".join(list(tool_nodes.keys())) if tool_nodes else "none"
+    prompt = f"""Analyze market data for {ticker} on {date}.
+
+{instrument}
+
+Available tools: {tool_list}
+Use the technical tools to fetch data and indicators.
+Write a concise market analysis with price action, trends, and key levels.
+{lang}"""
+    try:
+        result = llm.invoke([HumanMessage(content=prompt)])
+        return result.content if hasattr(result, "content") else str(result)
+    except Exception as e:
+        return f"Market analysis error: {e}"
 
 
 def _get_stock_data(symbol: str, start_date: str, end_date: str) -> str:
