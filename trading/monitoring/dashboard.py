@@ -204,37 +204,24 @@ def render_quick_analysis(trend: TREND):
     if "ticker_universe" not in st.session_state:
         with st.spinner("Loading ticker universe..."):
             st.session_state.ticker_universe = get_all_tickers()
-            st.session_state.ticker_labels = {
+            st.session_state.ticker_labels = [
+                format_ticker_display(t) for t in st.session_state.ticker_universe
+            ]
+            st.session_state.ticker_map = {
                 format_ticker_display(t): t["ticker"] for t in st.session_state.ticker_universe
             }
-    universe = st.session_state.ticker_universe
-    labels = st.session_state.ticker_labels
+    ticker_labels = st.session_state.ticker_labels
+    ticker_map = st.session_state.ticker_map
 
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
-        search = st.text_input("Search ticker", value="", placeholder="Type to search...", key="analysis_search")
-        if search.strip():
-            q = search.strip().upper()
-            matches = [
-                (fmt, tkr) for fmt, tkr in labels.items()
-                if q in fmt.upper()
-            ][:100]
-            if not matches:
-                matches = list(labels.items())[:100]
-        else:
-            matches = list(labels.items())[:100]
-        display_opts = [m[0] for m in matches]
-        ticker_map = dict(matches)
-        if not display_opts:
-            display_opts = ["AAPL — Apple Inc. (NASDAQ)"]
-            ticker_map = {"AAPL — Apple Inc. (NASDAQ)": "AAPL"}
         selected_label = st.selectbox(
             "Ticker",
-            display_opts,
-            index=0 if display_opts else None,
+            ticker_labels,
+            index=0,
             key="analysis_ticker",
         )
-        ticker = ticker_map.get(selected_label, matches[0][1] if matches else "AAPL")
+        ticker = ticker_map.get(selected_label, "AAPL")
     with col2:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
         default_prov = list(provider_opts.keys())[0]
