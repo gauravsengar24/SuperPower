@@ -1,0 +1,20 @@
+langchain-core>=0.3.81
+langgraph>=0.4.8
+pandas>=2.3.0
+yfinance>=1.4.1
+python-dotenv>=1.0.0
+typer>=0.21.0
+rich>=14.0.0
+pydantic>=2.0
+requests>=2.32
+parsel>=1.10
+stockstats>=0.6.5
+tqdm>=4.67
+pytz>=2025
+typing-extensions>=4.14
+streamlit>=1.35
+# Optional providers — uncomment as needed
+# langchain-openai>=0.3.23
+# langchain-anthropic>=0.3.15
+# langchain-google-genai>=1.0
+# alpaca-py>=0.30
