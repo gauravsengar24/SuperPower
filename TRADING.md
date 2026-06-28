@@ -120,7 +120,7 @@ trading/
 | 3 | Hard risk gates (AEGIS) | ✅ Done — 5 gates in chain-of-responsibility |
 | 4 | Execution engine (VELOCITY) | ✅ Done — paper + Alpaca adapters |
 | 5 | Portfolio management (ARCANE) | ✅ Done — P&L, positions, metrics |
-| 6 | Backtesting (MIDAS) | 📋 Planned |
+| 6 | Backtesting (MIDAS) | ✅ Done — full engine, metrics (Sharpe/Sortino/drawdown/CAGR), CLI, 17 tests |
 | 7 | Dashboard + monitoring (JANUS) | ✅ Done — provider fallback + drift detection |
 | 8 | Agent modules + test coverage | ✅ Done — 7 agent modules, 47 new tests (98 total) |
 | 9 | SuperPower trading skills | 📋 Planned |

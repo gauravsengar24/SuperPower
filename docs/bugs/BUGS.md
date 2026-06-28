@@ -121,6 +121,7 @@ All bugs identified during Phase 1 audit of the merged codebase.
 | Vendor routing | 0 | ≥80% | 📋 Planned (StockTwits, Reddit, FRED) |
 | LLM client creation | 11 | ≥80% | ✅ 11 tests written |
 | CLI interactive flow | 0 | ≥60% | 📋 Planned |
+| Backtesting engine (MIDAS) | 17 | ≥80% | ✅ 17 tests written |
 | Alpha Vantage dataflows | 3 | ≥70% | ✅ 3 tests (in interop suite) |
 | StockTwits + Reddit dataflows | 0 | ≥70% | 📋 Planned (not ported) |
 | AEGIS risk gates | 8 | ≥90% | ✅ Written |

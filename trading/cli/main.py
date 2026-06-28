@@ -94,10 +94,44 @@ def backtest(
     from_date: str = typer.Option("2020-01-01", "--from", "-f", help="Start date"),
     to_date: str = typer.Option("2023-12-31", "--to", "-t", help="End date"),
     interval: int = typer.Option(30, "--interval", "-i", help="Days between analyses"),
+    cash: float = typer.Option(100000.0, "--cash", "-c", help="Initial cash"),
+    max_positions: int = typer.Option(10, "--max-positions", help="AEGIS max positions"),
+    risk_per_trade: float = typer.Option(0.02, "--risk-per-trade", help="Risk per trade (pct)"),
 ):
     """Run M.I.D.A.S. backtesting — test strategy across historical window."""
-    console.print(f"[bold]M.I.D.A.S. Backtest:[/bold] {ticker} {from_date} → {to_date}")
-    console.print("[yellow]Backtesting coming in Phase 6 — use analyze for single-date runs[/yellow]")
+    from trading.backtesting.midas import MIDAS
+
+    console.print(f"[bold]M.I.D.A.S. Backtest:[/bold] {ticker} {from_date} \u2192 {to_date}")
+    console.print(f"  Initial cash: ${cash:,.0f} | Interval: {interval}d")
+
+    aegis_config = {
+        "max_positions": max_positions,
+        "default_risk_per_trade": risk_per_trade,
+    }
+
+    engine = MIDAS(initial_cash=cash, aegis_config=aegis_config)
+
+    with console.status("[bold green]Running backtest...[/bold green]") as status:
+        result = engine.run(ticker, from_date, to_date,
+                            interval_days=interval)
+
+    console.print()
+    m = result.metrics
+    tm = result.trade_metrics
+    table = Table(title=f"M.I.D.A.S. Results — {ticker}")
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", style="green")
+    table.add_row("Total Return", f"{m['total_return_pct']}%")
+    table.add_row("CAGR", f"{m['cagr_pct']}%")
+    table.add_row("Sharpe Ratio", str(m['sharpe_ratio']))
+    table.add_row("Sortino Ratio", str(m['sortino_ratio']))
+    table.add_row("Max Drawdown", f"{m['max_drawdown_pct']}%")
+    table.add_row("Volatility", f"{m['volatility_pct']}%")
+    table.add_row("Trades", str(tm['num_trades']))
+    table.add_row("Win Rate", f"{tm['win_rate']}%")
+    table.add_row("Profit Factor", str(tm['profit_factor']))
+    table.add_row("Final Value", f"${m['final_value']:,.2f}")
+    console.print(table)
 
 
 @cli.command()
