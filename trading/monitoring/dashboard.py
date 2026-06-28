@@ -178,10 +178,10 @@ def render_backtest():
             st.error("Failed to load backtest result")
 
 
-def _detect_available_providers() -> list[str]:
+def _detect_available_providers() -> list[tuple[str, str]]:
     providers = []
     if os.environ.get("OPENAI_API_KEY"):
-        providers.append(("openai", "gpt-4o-mini"))
+        providers.append(("openai", "gpt-5.4-mini"))
     if os.environ.get("ANTHROPIC_API_KEY"):
         providers.append(("anthropic", "claude-3-haiku-20240307"))
     if os.environ.get("GOOGLE_API_KEY"):
@@ -238,6 +238,7 @@ def render_quick_analysis(trend: TREND):
                     token_count=token_count,
                 )
                 st.success(f"Analysis complete ({duration_ms}ms, {token_count} tokens)")
+                st.markdown(f"**{ticker.upper()} Analysis**")
                 st.markdown(text)
             except Exception as e:
                 duration_ms = int((time.time() - start) * 1000)
@@ -249,7 +250,6 @@ def render_quick_analysis(trend: TREND):
                     error=str(e),
                 )
                 st.error(f"Analysis failed: {e}")
-            st.rerun()
 
 
 def render_recent_calls(trend: TREND):
