@@ -82,7 +82,15 @@ class TREND:
     def get_provider_stats(self, provider: str) -> dict:
         prov_records = [r for r in self.records if r.provider == provider]
         if not prov_records:
-            return {"provider": provider, "calls": 0}
+            return {
+                "provider": provider,
+                "calls": 0,
+                "success_rate": 0.0,
+                "avg_duration_ms": 0.0,
+                "max_duration_ms": 0.0,
+                "total_tokens": 0,
+                "errors": 0,
+            }
         durations = [r.duration_ms for r in prov_records]
         successes = sum(1 for r in prov_records if r.success)
         return {

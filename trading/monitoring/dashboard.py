@@ -77,12 +77,12 @@ def render_provider_health(trend: TREND):
             color = "#00d4aa" if is_active else "#666"
             st.markdown(
                 f'<div class="metric-card" style="border-color: {color}">'
-                f'<div class="metric-label">{stat["provider"].upper()}</div>'
+                f'<div class="metric-label">{stat.get("provider", "?").upper()}</div>'
                 f'<div class="metric-value" style="font-size:1rem;color:{color}">{status}</div>'
-                f'<div style="margin-top:8px">Calls: {stat["calls"]}</div>'
-                f'<div>Success: {stat["success_rate"]:.0%}</div>'
-                f'<div>Avg: {stat["avg_duration_ms"]:.0f}ms</div>'
-                f'<div>Tokens: {stat["total_tokens"]}</div>'
+                f'<div style="margin-top:8px">Calls: {stat.get("calls", 0)}</div>'
+                f'<div>Success: {stat.get("success_rate", 0):.0%}</div>'
+                f'<div>Avg: {stat.get("avg_duration_ms", 0):.0f}ms</div>'
+                f'<div>Tokens: {stat.get("total_tokens", 0)}</div>'
                 f"</div>",
                 unsafe_allow_html=True,
             )
