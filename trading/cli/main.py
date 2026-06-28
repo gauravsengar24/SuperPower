@@ -97,7 +97,7 @@ def backtest(
         help="End date (default: today)",
     ),
     interval: int = typer.Option(30, "--interval", "-i", help="Days between analyses"),
-    cash: float = typer.Option(100000.0, "--cash", "-c", help="Initial cash"),
+    cash: float = typer.Option(10_000_000.0, "--cash", "-c", help="Initial cash"),
     max_positions: int = typer.Option(10, "--max-positions", help="AEGIS max positions"),
     risk_per_trade: float = typer.Option(0.02, "--risk-per-trade", help="Risk per trade (pct)"),
 ):

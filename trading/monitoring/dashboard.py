@@ -160,7 +160,7 @@ def render_backtest():
         with col_b:
             bt_to = st.text_input("End date", value=datetime.now().strftime("%Y-%m-%d"), key="bt_to")
         with col_c:
-            bt_cash = st.number_input("Initial cash ($)", value=100_000, step=10_000, key="bt_cash")
+            bt_cash = st.number_input("Initial cash ($)", value=10_000_000, step=1_000_000, key="bt_cash")
         if st.button("Run Backtest", type="primary", key="bt_run"):
             from trading.backtesting.midas import MIDAS
             with st.spinner(f"Running backtest for {bt_ticker.strip().upper()}..."):

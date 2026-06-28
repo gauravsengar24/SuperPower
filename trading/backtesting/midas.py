@@ -113,7 +113,7 @@ class BacktestResult:
 
 
 class MIDAS:
-    def __init__(self, initial_cash: float = 100_000.0, aegis_config: Optional[dict] = None,
+    def __init__(self, initial_cash: float = 10_000_000.0, aegis_config: Optional[dict] = None,
                  broker: Optional[HermesPaperBroker] = None):
         self.initial_cash = initial_cash
         self.aegis_config = aegis_config or {}
