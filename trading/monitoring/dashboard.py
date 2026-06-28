@@ -215,22 +215,16 @@ def render_quick_analysis(trend: TREND):
 
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
-        search = st.text_input("Search ticker or company", value="", placeholder="e.g. Apple, Reliance, MSFT...", key="ticker_search")
-        q = search.strip().lower()
-        if q:
-            filtered = [lbl for lbl in ticker_all_labels if q in lbl.lower()]
-            if not filtered:
-                filtered = ticker_all_labels[:200]
-        else:
-            filtered = ticker_all_labels[:200]
-        selected_label = st.selectbox(
-            "Ticker",
-            filtered,
-            index=0,
-            key="analysis_ticker",
-        )
-        ticker = ticker_all_map.get(selected_label, "AAPL")
-        st.caption(f"{len(ticker_all_labels):,} total" if not q else f"{len(filtered):,} matches of {len(ticker_all_labels):,}")
+        raw = st.text_input("Ticker", value="", placeholder="e.g. AAPL, MSFT, RELIANCE.NS...", key="analysis_ticker")
+        ticker = raw.strip().upper()
+        if ticker:
+            matches = [lbl for lbl in ticker_all_labels if ticker in lbl.upper()]
+            if len(matches) == 1:
+                st.caption(f"✅ {matches[0]}")
+            elif len(matches) > 1:
+                st.caption(f"🔍 {len(matches)} matches — be more specific")
+            else:
+                st.caption("⚠️ Ticker not found in universe")
     with col2:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
         default_prov = list(provider_opts.keys())[0]
