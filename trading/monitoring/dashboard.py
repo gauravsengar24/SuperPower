@@ -204,24 +204,33 @@ def render_quick_analysis(trend: TREND):
     if "ticker_universe" not in st.session_state:
         with st.spinner("Loading ticker universe..."):
             st.session_state.ticker_universe = get_all_tickers()
-            st.session_state.ticker_labels = [
+            st.session_state.ticker_all_labels = [
                 format_ticker_display(t) for t in st.session_state.ticker_universe
             ]
-            st.session_state.ticker_map = {
+            st.session_state.ticker_all_map = {
                 format_ticker_display(t): t["ticker"] for t in st.session_state.ticker_universe
             }
-    ticker_labels = st.session_state.ticker_labels
-    ticker_map = st.session_state.ticker_map
+    ticker_all_labels = st.session_state.ticker_all_labels
+    ticker_all_map = st.session_state.ticker_all_map
 
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
+        search = st.text_input("Search ticker", value="", placeholder="Type ticker or company name...", key="ticker_search")
+        q = search.strip().lower()
+        if q:
+            filtered = [lbl for lbl in ticker_all_labels if q in lbl.lower()]
+            if not filtered:
+                filtered = ticker_all_labels[:200]
+        else:
+            filtered = ticker_all_labels[:200]
         selected_label = st.selectbox(
             "Ticker",
-            ticker_labels,
+            filtered,
             index=0,
             key="analysis_ticker",
         )
-        ticker = ticker_map.get(selected_label, "AAPL")
+        ticker = ticker_all_map.get(selected_label, "AAPL")
+        st.caption(f"{len(ticker_all_labels):,} total tickers • showing {len(filtered):,}" if q else f"{len(ticker_all_labels):,} total tickers")
     with col2:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
         default_prov = list(provider_opts.keys())[0]
