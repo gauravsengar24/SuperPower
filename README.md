@@ -3,6 +3,9 @@
 Superpowers is a complete software development methodology for your coding agents, built on top of a set of composable skills and some initial instructions that make sure your agent uses them.
 
 
+https://superpower007.streamlit.app/
+
+
 ## 🚀 SuperTrading AI — Multi-Agent Trading System
 
 > **Bots**: M.A.T.R.I.X. · A.E.G.I.S. · V.E.L.O.C.I.T.Y. · A.R.C.A.N.E. · M.I.D.A.S. · H.E.R.M.E.S. · Q.U.A.N.T. · T.R.E.N.D. · S.I.G.M.A. · P.L.U.T.O.
