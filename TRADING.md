@@ -123,7 +123,7 @@ trading/
 | 6 | Backtesting (MIDAS) | ✅ Done — full engine, metrics (Sharpe/Sortino/drawdown/CAGR), CLI, 17 tests |
 | 7 | Dashboard + monitoring (TREND) | ✅ Done — Streamlit UI, provider health, portfolio viewer, backtest viewer |
 | 8 | Agent modules + test coverage | ✅ Done — 7 agent modules, 47 new tests (98 total) |
-| 9 | SuperPower trading skills | 📋 Planned |
+| 9 | SuperPower trading skills | ✅ Done — 3 skills: trading-analysis, trading-backtest, trading-portfolio-review |
 
 ---
 
@@ -139,6 +139,18 @@ trading/
 | B6 | Sentiment analyst dead ToolNode | 🟢 Low | ✅ Fixed |
 | B7 | Multiple `print()` in production code | 🟢 Low | ✅ Fixed |
 | B8 | Polymarket return type mismatch | 🟠 Medium | ✅ Fixed |
+
+---
+
+## SuperPower Trading Skills
+
+Trading-specific skills for the SuperPower agent framework:
+
+| Skill | File | Purpose |
+|-------|------|---------|
+| `trading-analysis` | `skills/trading-analysis/SKILL.md` | Multi-agent ticker analysis via MATRIX pipeline |
+| `trading-backtest` | `skills/trading-backtest/SKILL.md` | MIDAS backtesting with parameter exploration |
+| `trading-portfolio-review` | `skills/trading-portfolio-review/SKILL.md` | Portfolio status, P&L, risk exposure review |
 
 ---
 
