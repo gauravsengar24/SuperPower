@@ -203,28 +203,35 @@ def render_quick_analysis(trend: TREND):
 
     if "ticker_universe" not in st.session_state:
         with st.spinner("Loading ticker universe..."):
-            st.session_state.ticker_universe = get_all_tickers()
-            st.session_state.ticker_all_labels = [
-                format_ticker_display(t) for t in st.session_state.ticker_universe
-            ]
-            st.session_state.ticker_all_map = {
-                format_ticker_display(t): t["ticker"] for t in st.session_state.ticker_universe
-            }
-    ticker_all_labels = st.session_state.ticker_all_labels
-    ticker_all_map = st.session_state.ticker_all_map
+            universe = get_all_tickers()
+            st.session_state.ticker_universe = universe
+            browse = sorted(
+                [f"{t['name']} ({t.get('exchange', '')}) — {t['ticker']}" for t in universe],
+                key=lambda s: s.lower(),
+            )
+            st.session_state.ticker_browse_labels = browse
+            st.session_state.ticker_browse_map = {}
+            for t in universe:
+                lbl = f"{t['name']} ({t.get('exchange', '')}) — {t['ticker']}"
+                st.session_state.ticker_browse_map[lbl] = t["ticker"]
+    browse_labels = st.session_state.ticker_browse_labels
+    browse_map = st.session_state.ticker_browse_map
 
-    col1, col2, col3 = st.columns([2, 2, 1])
-    with col1:
-        raw = st.text_input("Ticker", value="", placeholder="e.g. AAPL, MSFT, RELIANCE.NS...", key="analysis_ticker")
-        ticker = raw.strip().upper()
-        if ticker:
-            matches = [lbl for lbl in ticker_all_labels if ticker in lbl.upper()]
-            if len(matches) == 1:
-                st.caption(f"✅ {matches[0]}")
-            elif len(matches) > 1:
-                st.caption(f"🔍 {len(matches)} matches — be more specific")
-            else:
-                st.caption("⚠️ Ticker not found in universe")
+    search_q = st.text_input("Search ticker or company", placeholder="e.g. Apple, MSFT, Reliance...", key="ticker_search")
+    q = search_q.strip()
+    if q:
+        ul = q.upper()
+        matched = [lbl for lbl in browse_labels if ul in lbl.upper()]
+        shown = matched[:250] if matched else ["— No matches —"]
+    else:
+        shown = browse_labels[:250]
+    selected_lbl = st.selectbox("Select a ticker", shown, index=0, key="analysis_ticker")
+    ticker = browse_map.get(selected_lbl) or q.upper()
+
+    if q and not any(ticker in lbl for lbl in browse_labels):
+        st.caption("⚠️ Ticker not found in universe")
+
+    col2, col3 = st.columns([2, 1])
     with col2:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
         default_prov = list(provider_opts.keys())[0]
