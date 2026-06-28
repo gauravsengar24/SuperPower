@@ -12,6 +12,7 @@ def compute_metrics(equity_curve: Sequence[float], risk_free_rate: float = 0.05)
         risk_free_rate: Annual risk-free rate (default 5%).
     """
     if len(equity_curve) < 2:
+        initial = equity_curve[0] if equity_curve else 0.0
         return {
             "total_return_pct": 0.0,
             "cagr_pct": 0.0,
@@ -21,6 +22,9 @@ def compute_metrics(equity_curve: Sequence[float], risk_free_rate: float = 0.05)
             "volatility_pct": 0.0,
             "win_rate": 0.0,
             "num_trades": 0,
+            "num_periods": 0,
+            "final_value": initial,
+            "initial_value": initial,
         }
 
     returns = []
@@ -83,7 +87,7 @@ def compute_metrics(equity_curve: Sequence[float], risk_free_rate: float = 0.05)
 def compute_trade_metrics(trades: list[dict]) -> dict:
     """Compute trade-level metrics from a list of trade records."""
     if not trades:
-        return {"win_rate": 0.0, "num_trades": 0, "avg_win": 0.0, "avg_loss": 0.0, "profit_factor": 0.0}
+        return {"win_rate": 0.0, "num_trades": 0, "avg_win": 0.0, "avg_loss": 0.0, "profit_factor": 0.0, "total_pnl": 0.0}
 
     wins = [t for t in trades if t.get("pnl", 0) > 0]
     losses = [t for t in trades if t.get("pnl", 0) < 0]

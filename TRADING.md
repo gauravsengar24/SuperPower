@@ -12,16 +12,16 @@
 | Bot | Role | Status |
 |-----|------|--------|
 | **M.A.T.R.I.X.** | Multi-agent analysis orchestration (fka TradingAgents core) | ✅ Ported |
-| **A.E.G.I.S.** | Hard risk gates — circuit breakers, VaR, position limits | 🔧 In progress |
-| **V.E.L.O.C.I.T.Y.** | Real-time execution engine — broker routing, OMS | 🚧 Planned |
-| **A.R.C.A.N.E.** | Portfolio management — P&L tracking, allocation, rebalancing | 🚧 Planned |
-| **R.A.P.T.O.R.** | Market data feeds — WebSocket + REST | 🚧 Planned |
-| **M.I.D.A.S.** | Backtesting — walk-forward, parameter optimization | 🚧 Planned |
-| **H.E.R.M.E.S.** | Paper trading bridge | 🚧 Planned |
+| **A.E.G.I.S.** | Hard risk gates — circuit breakers, position limits, drawdown | ✅ Done |
+| **V.E.L.O.C.I.T.Y.** | Real-time execution engine — broker routing, OMS | ✅ Done |
+| **A.R.C.A.N.E.** | Portfolio management — P&L tracking, allocation, rebalancing | ✅ Done |
+| **R.A.P.T.O.R.** | Market data feeds — WebSocket + REST | 📋 Planned |
+| **M.I.D.A.S.** | Backtesting — walk-forward, parameter optimization | ✅ Done |
+| **H.E.R.M.E.S.** | Paper trading bridge | ✅ Done |
 | **S.I.G.M.A.** | Signal processing + test coverage | ✅ Ported |
 | **Q.U.A.N.T.** | LLM provider routing — cost-optimized model dispatch | ✅ Ported |
 | **T.R.E.N.D.** | Dashboard — real-time P&L, decisions, risk state | ✅ Done |
-| **P.L.U.T.O.** | CI/CD — GitHub Actions, Docker, deployment | 🔧 In progress |
+| **P.L.U.T.O.** | CI/CD — GitHub Actions, Docker, deployment | ✅ Done |
 
 ---
 

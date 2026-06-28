@@ -54,9 +54,16 @@ def load_trend_state() -> TREND:
             for rec in data.get("records", []):
                 trend.record_call(**rec)
             return trend
-        except (json.JSONDecodeError, KeyError, TypeError):
+        except Exception:
             pass
     return TREND()
+
+
+def save_trend_state(trend: TREND):
+    state_dir = Path("~/.trading").expanduser()
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_path = state_dir / "trend_state.json"
+    state_path.write_text(json.dumps(trend.to_dict(), indent=2))
 
 
 def load_portfolio() -> Optional[ARCANE]:
@@ -184,20 +191,40 @@ def render_recent_calls(trend: TREND):
 
 
 def run_dashboard(host: str = "0.0.0.0", port: int = 8501):
-    trend = load_trend_state()
-    arcane = load_portfolio()
+    try:
+        trend = load_trend_state()
+    except Exception:
+        trend = TREND()
+        st.warning("Failed to load trend state, using defaults")
+    try:
+        arcane = load_portfolio()
+    except Exception:
+        arcane = None
 
     st.markdown(DARK_CSS, unsafe_allow_html=True)
     st.title("T.R.E.N.D. — Tactical Rick-Evaluation and Network Directed-trading")
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-    render_provider_health(trend)
-    st.divider()
-    render_portfolio(arcane)
-    st.divider()
-    render_backtest()
-    st.divider()
-    render_recent_calls(trend)
+    sections = [
+        ("Provider Health", lambda: render_provider_health(trend)),
+        ("Portfolio", lambda: render_portfolio(arcane)),
+        ("Backtest Viewer", lambda: render_backtest()),
+        ("Recent LLM Calls", lambda: render_recent_calls(trend)),
+    ]
+    for i, (name, render_fn) in enumerate(sections):
+        try:
+            if i > 0:
+                st.divider()
+            render_fn()
+        except Exception as e:
+            st.error(f"{name} unavailable: {e}")
+            import traceback
+            st.code(traceback.format_exc(), language="python")
+
+    try:
+        save_trend_state(trend)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

@@ -93,6 +93,7 @@ class TREND:
             }
         durations = [r.duration_ms for r in prov_records]
         successes = sum(1 for r in prov_records if r.success)
+        errors = sum(1 for r in prov_records if not r.success)
         return {
             "provider": provider,
             "calls": len(prov_records),
@@ -100,6 +101,7 @@ class TREND:
             "avg_duration_ms": mean(durations),
             "max_duration_ms": max(durations),
             "total_tokens": sum(r.token_count for r in prov_records),
+            "errors": errors,
         }
 
     def get_summary(self) -> dict:
@@ -110,5 +112,22 @@ class TREND:
             "total_errors": sum(1 for r in self.records if not r.success),
             "provider_stats": [
                 self.get_provider_stats(p) for p in self.fallback_chain
+            ],
+        }
+
+    def to_dict(self) -> dict:
+        return {
+            "config": self.config,
+            "records": [
+                {
+                    "provider": r.provider,
+                    "model": r.model,
+                    "duration_ms": r.duration_ms,
+                    "success": r.success,
+                    "token_count": r.token_count,
+                    "error": r.error,
+                    "timestamp": r.timestamp,
+                }
+                for r in self.records
             ],
         }
