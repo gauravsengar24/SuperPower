@@ -1,1 +1,1 @@
-# Data vendor abstraction — yfinance, Alpha Vantage, FRED, Polymarket, StockTwits, Reddit
+# Data vendor abstraction — yfinance, Alpha Vantage, World Bank, FRED, Polymarket, StockTwits, Reddit

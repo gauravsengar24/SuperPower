@@ -10,9 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 def run_fundamentals_analyst(ticker, instrument, lang, llm):
+    from trading.dataflows.world_bank import get_macro_economic_data
+    macro = get_macro_economic_data(ticker, years=5)
+    context = instrument + "\n\n" + macro if "No data" not in macro and "Could not" not in macro else instrument
+
     prompt = f"""Perform deep fundamental analysis of {ticker}.
 
-{instrument}
+{context}
 
 This requires deep reasoning — take your time.
 Evaluate the following in detail:
@@ -21,7 +25,7 @@ Evaluate the following in detail:
 2. Growth Metrics: revenue growth, EPS growth, forward guidance
 3. Valuation: P/E ratio (trailing + forward), P/B, PEG, EV/EBITDA
 4. Competitive Position: market share, moat, industry trends
-5. Risks: regulatory, competitive, operational, macroeconomic
+5. Risks: regulatory, competitive, operational, macroeconomic (use World Bank data above)
 
 Provide a clear fundamental outlook: BULLISH / BEARISH / NEUTRAL
 with supporting evidence for each point.

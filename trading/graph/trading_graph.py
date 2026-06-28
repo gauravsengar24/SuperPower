@@ -31,6 +31,7 @@ from trading.dataflows.y_finance import (
     get_insider_transactions,
 )
 from trading.dataflows.yfinance_news import get_news, get_global_news
+from trading.dataflows.world_bank import get_macro_economic_data, list_available_indicators
 from trading.reporting import write_report_tree
 
 logger = logging.getLogger(__name__)
@@ -42,9 +43,23 @@ ANALYST_NEWS = "news"
 ANALYST_FUNDAMENTALS = "fundamentals"
 
 
-def _get_macro_indicators(*args, **kwargs):
-    """Fetch macro-economic indicators for the given context."""
-    return "Macro indicators data — coming in Phase 5"
+def _get_macro_indicators(ticker: str = "", years: int = 5, indicators: str = "all") -> str:
+    """Fetch macroeconomic indicators from the World Bank.
+
+    Provides GDP, inflation, unemployment, debt, and other country-level
+    economic data for a ticker's home country.
+
+    Args:
+        ticker: Stock ticker symbol (e.g. AAPL, RELIANCE.NS).
+        years: Number of years of historical data (default 5).
+        indicators: Comma-separated indicator names or "all" for defaults.
+                   Available: GDP, GDP growth, GDP per capita, Inflation,
+                   Unemployment, Government debt, Current account, FDI, Exports, Population.
+
+    Returns:
+        Formatted economic data or an explanation message.
+    """
+    return get_macro_economic_data(ticker_or_country=ticker, years=years, indicators=indicators)
 
 
 def _get_prediction_markets(*args, **kwargs):
@@ -136,6 +151,8 @@ class TradingAgentsGraph:
                 get_balance_sheet,
                 get_cashflow,
                 get_income_statement,
+                _get_macro_indicators,
+                get_macro_economic_data,
             ]),
         }
 
