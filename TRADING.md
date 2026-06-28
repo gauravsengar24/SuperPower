@@ -2,6 +2,7 @@
 
 > **Umbrella**: A.R.C.A.N.E. Trading Intelligence Systems  
 > **Repo**: https://github.com/gauravsengar24/SuperPower  
+> **Dashboard**: https://supertrading-ai.streamlit.app  
 > **Author**: [@gauravsengar24](https://github.com/gauravsengar24)
 
 ---
@@ -124,6 +125,7 @@ trading/
 | 7 | Dashboard + monitoring (TREND) | ✅ Done — Streamlit UI, provider health, portfolio viewer, backtest viewer |
 | 8 | Agent modules + test coverage | ✅ Done — 7 agent modules, 47 new tests (98 total) |
 | 9 | SuperPower trading skills | ✅ Done — 3 skills: trading-analysis, trading-backtest, trading-portfolio-review |
+| 10 | Webapp deployment | ✅ Done — Streamlit Cloud, GitHub Pages, Codespaces |
 
 ---
 
