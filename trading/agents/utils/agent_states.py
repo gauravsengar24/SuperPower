@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Agent state TypedDicts for the LangGraph pipeline."""
 
 from typing import Any, Sequence

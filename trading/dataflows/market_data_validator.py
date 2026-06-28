@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Deterministic OHLCV snapshot — ground truth for agent price claims."""
 
 import logging

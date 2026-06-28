@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Alpaca Markets broker adapter.
 
 Free tier: paper trading + live trading with no per-query charges.

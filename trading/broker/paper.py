@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """H.E.R.M.E.S. — Paper Trading Engine.
 
 Simulates order fills with configurable slippage, latency, and partial fills.

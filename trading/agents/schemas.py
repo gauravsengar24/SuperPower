@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Pydantic models for structured agent output."""
 
 from pydantic import BaseModel, Field

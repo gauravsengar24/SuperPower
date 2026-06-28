@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """V.E.L.O.C.I.T.Y. — Execution Engine.
 
 Pipeline: Validate order → Route to broker → Monitor fill → Report back.

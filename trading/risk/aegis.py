@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """A.E.G.I.S. — Asset Equity Guidance and Insurance System.
 
 Chain-of-responsibility pattern: every gate runs sequentially. If ANY gate
@@ -20,7 +22,7 @@ Each gate implements:
 
 from dataclasses import dataclass, field
 from enum import Enum, auto
-from typing import Any
+from typing import Any, Union, Optional
 
 
 class GateDecision(Enum):

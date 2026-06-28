@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """TradingMemoryLog — Append-only markdown decision log with rotation."""
 
 import json

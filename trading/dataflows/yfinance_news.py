@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Yahoo Finance news fetching with look-ahead filtering."""
 
 import logging

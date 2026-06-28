@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Abstract broker interface.
 
 All concrete brokers implement this ABC. Design principle:

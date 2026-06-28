@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """J.A.N.U.S. — Joint Analytic Network for Underlying Signals.
 
 Monitors LLM provider health, detects drift in agent outputs,

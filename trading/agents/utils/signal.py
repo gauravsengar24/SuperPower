@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Signal processing — extract clean ratings from raw LLM output."""
 
 import re

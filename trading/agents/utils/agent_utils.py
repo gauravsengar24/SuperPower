@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Central hub: re-exports data tools, resolves instrument identity, builds context strings."""
 
 import json

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """Report tree writer — saves analysis results as markdown files."""
 
 from datetime import datetime

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """LLM client factory — routes provider string to the correct client implementation."""
 
 import logging

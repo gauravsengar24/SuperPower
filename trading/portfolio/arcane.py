@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 """A.R.C.A.N.E. — Algorithmic Risk, Capital, and Analytic Network Engine.
 
 Manages portfolio state: positions, P&L, allocation targets, rebalancing.
