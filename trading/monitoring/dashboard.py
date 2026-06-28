@@ -369,7 +369,7 @@ def run_dashboard(host: str = "0.0.0.0", port: int = 8501):
         st.divider()
         st.markdown("### Quickstart")
         st.code("trading analyze AAPL")
-        st.code("trading backtest AAPL --from 2020-01-01 --to 2023-12-31")
+        st.code("trading backtest AAPL --from 2020-01-01  # defaults to present")
         st.markdown("[GitHub](https://github.com/gauravsengar24/SuperPower) • [Docs](https://github.com/gauravsengar24/SuperPower/blob/main/TRADING.md)")
 
     sections = [

@@ -10,7 +10,7 @@ Guide the user through running and interpreting a backtest with `trading backtes
 ## Quickstart
 
 ```
-trading backtest AAPL --from 2020-01-01 --to 2023-12-31 --interval 30
+trading backtest AAPL --from 2020-01-01  # defaults to present
 ```
 
 ## The Process

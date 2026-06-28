@@ -34,7 +34,7 @@ Present the output in this structure:
 6. **Decision Summary** — final trade decision with reasoning
 
 ### Step 4: Discuss Next Steps
-- Run a backtest (`trading backtest {TICKER} --from 2020-01-01 --to 2023-12-31`)
+- Run a backtest (`trading backtest {TICKER} --from 2020-01-01` — defaults to present)
 - Launch dashboard (`trading dashboard`)
 - View portfolio (`trading portfolio`)
 - Adjust risk parameters and re-run
