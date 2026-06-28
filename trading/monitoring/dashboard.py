@@ -19,6 +19,7 @@ from trading.monitoring.trend import TREND
 from trading.portfolio.arcane import ARCANE
 from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
 from trading.ticker_universe import get_all_tickers, format_ticker_display
+from trading.dataflows.world_bank import get_macro_economic_data
 
 try:  # noqa: E402
     from langchain_core.messages import HumanMessage
@@ -310,11 +311,16 @@ def render_quick_analysis(trend: TREND):
         start = time.time()
         with st.spinner(f"Fetching data for {ticker.upper()}..."):
             snapshot = _fetch_ticker_snapshot(ticker)
+            macro = get_macro_economic_data(ticker, years=5, indicators="GDP, GDP growth, Inflation, Unemployment")
         with st.spinner(f"Analyzing {ticker.upper()} via {provider}..."):
             try:
                 client = create_llm_client(provider=provider, model=model)
                 llm = client.get_llm()
-                data_block = f"\nLive market data:\n{snapshot}\n" if snapshot else ""
+                data_block = ""
+                if snapshot:
+                    data_block += f"\nLive market data:\n{snapshot}\n"
+                if macro and "No data" not in macro and "Could not" not in macro:
+                    data_block += f"\nMacroeconomic context:\n{macro}\n"
                 prompt = (
                     f"You are a professional stock analyst. Analyze {ticker.upper()} "
                     f"as of {datetime.now().strftime('%Y-%m-%d')}.{data_block}"
@@ -339,6 +345,9 @@ def render_quick_analysis(trend: TREND):
                 if snapshot:
                     st.markdown("**Live Data**")
                     st.code(snapshot)
+                if macro and "No data" not in macro and "Could not" not in macro:
+                    st.markdown("**Macroeconomic Context (World Bank)**")
+                    st.code(macro)
                 st.markdown(f"**{ticker.upper()} Analysis**")
                 st.markdown(text)
             except Exception as e:
