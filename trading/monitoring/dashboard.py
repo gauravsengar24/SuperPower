@@ -6,6 +6,7 @@ and backtest results in a single-pane glassmorphism UI.
 
 import json
 import os
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -16,6 +17,13 @@ import pandas as pd
 from trading.monitoring.trend import TREND
 from trading.portfolio.arcane import ARCANE
 from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
+
+try:
+    from langchain_core.messages import HumanMessage
+    from trading.llm_clients import create_llm_client
+    HAS_LLM = True
+except ImportError:
+    HAS_LLM = False
 
 st.set_page_config(
     page_title="T.R.E.N.D. Dashboard",
@@ -170,6 +178,80 @@ def render_backtest():
             st.error("Failed to load backtest result")
 
 
+def _detect_available_providers() -> list[str]:
+    providers = []
+    if os.environ.get("OPENAI_API_KEY"):
+        providers.append(("openai", "gpt-4o-mini"))
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        providers.append(("anthropic", "claude-3-haiku-20240307"))
+    if os.environ.get("GOOGLE_API_KEY"):
+        providers.append(("google", "gemini-2.0-flash-lite"))
+    return providers
+
+
+def render_quick_analysis(trend: TREND):
+    st.subheader("Quick Analysis")
+    if not HAS_LLM:
+        st.warning("LLM provider packages not installed. Run `pip install langchain-openai` and add your API key.")
+        return
+
+    available = _detect_available_providers()
+    if not available:
+        st.info("No API keys configured. Set OPENAI_API_KEY (or ANTHROPIC_API_KEY / GOOGLE_API_KEY) in Streamlit Secrets or .env to run live analysis.")
+        return
+
+    col1, col2, col3 = st.columns([2, 2, 1])
+    with col1:
+        ticker = st.text_input("Ticker", value="AAPL", key="analysis_ticker")
+    with col2:
+        provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
+        default_prov = list(provider_opts.keys())[0]
+        prov_choice = st.selectbox("Provider", list(provider_opts.keys()), index=0, key="analysis_provider")
+    with col3:
+        run = st.button("Analyze", type="primary", use_container_width=True)
+
+    if run and ticker.strip():
+        provider, model = provider_opts[prov_choice]
+        start = time.time()
+        with st.spinner(f"Analyzing {ticker.upper()} via {provider}..."):
+            try:
+                client = create_llm_client(provider=provider, model=model)
+                llm = client.get_llm()
+                prompt = (
+                    f"You are a professional stock analyst. Analyze {ticker.upper()} "
+                    f"as of {datetime.now().strftime('%Y-%m-%d')}. "
+                    f"Provide a concise summary covering: 1) Recent price action, "
+                    f"2) Key support/resistance levels, 3) Bull case, 4) Bear case, "
+                    f"5) Overall signal (STRONG BUY / BUY / HOLD / SELL / STRONG SELL). "
+                    f"Keep it under 200 words."
+                )
+                result = llm.invoke([HumanMessage(content=prompt)])
+                duration_ms = int((time.time() - start) * 1000)
+                text = result.content if hasattr(result, "content") else str(result)
+                token_count = getattr(result, "usage_metadata", {}).get("total_tokens", 0) or 0
+
+                trend.record_call(
+                    provider=provider,
+                    model=model,
+                    duration_ms=duration_ms,
+                    success=True,
+                    token_count=token_count,
+                )
+                st.success(f"Analysis complete ({duration_ms}ms, {token_count} tokens)")
+                st.markdown(text)
+            except Exception as e:
+                duration_ms = int((time.time() - start) * 1000)
+                trend.record_call(
+                    provider=provider,
+                    model=model,
+                    duration_ms=duration_ms,
+                    success=False,
+                    error=str(e),
+                )
+                st.error(f"Analysis failed: {e}")
+            st.rerun()
+
+
 def render_recent_calls(trend: TREND):
     st.subheader("Recent LLM Calls")
     records = trend.records[-20:][::-1]
@@ -205,7 +287,22 @@ def run_dashboard(host: str = "0.0.0.0", port: int = 8501):
     st.title("T.R.E.N.D. — Tactical Rick-Evaluation and Network Directed-trading")
     st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
+    with st.sidebar:
+        st.markdown("### Configuration")
+        available = _detect_available_providers()
+        if available:
+            for prov, model in available:
+                st.success(f"✅ {prov.upper()} ({model})")
+        else:
+            st.warning("No API keys configured")
+        st.divider()
+        st.markdown("### Quickstart")
+        st.code("trading analyze AAPL")
+        st.code("trading backtest AAPL --from 2020-01-01 --to 2023-12-31")
+        st.markdown("[GitHub](https://github.com/gauravsengar24/SuperPower) • [Docs](https://github.com/gauravsengar24/SuperPower/blob/main/TRADING.md)")
+
     sections = [
+        ("Quick Analysis", lambda: render_quick_analysis(trend)),
         ("Provider Health", lambda: render_provider_health(trend)),
         ("Portfolio", lambda: render_portfolio(arcane)),
         ("Backtest Viewer", lambda: render_backtest()),

@@ -13,8 +13,10 @@ tqdm>=4.67
 pytz>=2025
 typing-extensions>=4.14
 streamlit>=1.35
-# Optional providers — uncomment as needed
-# langchain-openai>=0.3.23
+# Default provider (needed for LLM calls)
+langchain-openai>=0.3.23
+# Additional providers — uncomment as needed
+# langchain-anthropic>=0.3.15
 # langchain-anthropic>=0.3.15
 # langchain-google-genai>=1.0
 # alpaca-py>=0.30
