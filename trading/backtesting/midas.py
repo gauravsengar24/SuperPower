@@ -7,7 +7,7 @@ performance metrics and reports.
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from trading.broker.base import Order, OrderSide, OrderType, OrderStatus
 from trading.broker.paper import HermesPaperBroker
@@ -51,6 +51,15 @@ class BacktestResult:
         self.initial_cash = initial_cash
         self._metrics = None
         self._trade_metrics = None
+
+    def to_dict(self) -> dict:
+        return {
+            "ticker": self.ticker,
+            "start_date": self.start_date,
+            "end_date": self.end_date,
+            "initial_cash": self.initial_cash,
+            "steps": [s.to_dict() for s in self.steps],
+        }
 
     @property
     def equity_curve(self) -> list[float]:

@@ -147,37 +147,73 @@ def render_portfolio(arcane: Optional[ARCANE]):
 def render_backtest():
     st.subheader("Backtest Viewer")
     results_dir = Path("~/.trading/backtest_results").expanduser()
-    if not results_dir.exists():
-        st.info("No backtest results found. Run `trading backtest` first.")
-        return
+    results_dir.mkdir(parents=True, exist_ok=True)
     result_files = sorted(results_dir.glob("*.json"), reverse=True)
-    if not result_files:
-        st.info("No backtest results found.")
-        return
 
-    selected = st.selectbox(
-        "Select backtest result",
-        [f.name for f in result_files],
-    )
-    if selected:
-        path = results_dir / selected
-        try:
-            data = json.loads(path.read_text())
-            equity = data.get("equity_curve", [])
-            trades = data.get("trades", [])
-            if equity:
-                metrics = compute_metrics(equity)
-                trade_met = compute_trade_metrics(trades)
-                st.markdown("**Metrics**")
-                cols = st.columns(4)
-                for col, (k, v) in zip(cols, list(metrics.items())[:4]):
-                    with col:
-                        st.metric(k.replace("_", " ").title(), v)
-                if len(equity) > 1:
-                    df = pd.DataFrame({"equity": equity})
-                    st.line_chart(df)
-        except (json.JSONDecodeError, KeyError):
-            st.error("Failed to load backtest result")
+    if result_files:
+        selected = st.selectbox(
+            "Select saved result",
+            [f.name for f in result_files],
+        )
+        if selected:
+            path = results_dir / selected
+            try:
+                data = json.loads(path.read_text())
+                equity = data.get("equity_curve", [])
+                trades = data.get("trades", [])
+                if equity:
+                    metrics = compute_metrics(equity)
+                    trade_met = compute_trade_metrics(trades)
+                    st.markdown("**Metrics**")
+                    cols = st.columns(4)
+                    for col, (k, v) in zip(cols, list(metrics.items())[:4]):
+                        with col:
+                            st.metric(k.replace("_", " ").title(), v)
+                    if len(equity) > 1:
+                        df = pd.DataFrame({"equity": equity})
+                        st.line_chart(df)
+            except (json.JSONDecodeError, KeyError):
+                st.error("Failed to load backtest result")
+        st.divider()
+
+    with st.expander("Run a backtest", expanded=not bool(result_files)):
+        bt_ticker = st.text_input("Ticker", value="AAPL", key="bt_ticker", placeholder="e.g. AAPL, MSFT")
+        col_a, col_b, col_c = st.columns(3)
+        with col_a:
+            bt_from = st.text_input("Start date", value="2020-01-01", key="bt_from")
+        with col_b:
+            bt_to = st.text_input("End date", value=datetime.now().strftime("%Y-%m-%d"), key="bt_to")
+        with col_c:
+            bt_cash = st.number_input("Initial cash ($)", value=100_000, step=10_000, key="bt_cash")
+        if st.button("Run Backtest", type="primary", key="bt_run"):
+            from trading.backtesting.midas import MIDAS
+            with st.spinner(f"Running backtest for {bt_ticker.strip().upper()}..."):
+                try:
+                    engine = MIDAS(initial_cash=float(bt_cash))
+                    result = engine.run(bt_ticker.strip().upper(), bt_from, bt_to)
+                    slug = f"{bt_ticker.strip().upper()}_{bt_from}_{bt_to}".replace(".", "_")
+                    (results_dir / f"{slug}.json").write_text(json.dumps(result.to_dict(), indent=2))
+                    m = result.metrics
+                    tm = result.trade_metrics
+                    st.success(f"Backtest complete — {len(result.steps)} steps, {tm['num_trades']} trades")
+                    cols = st.columns(4)
+                    metrics_data = [
+                        ("Return", f"{m['total_return_pct']}%"),
+                        ("CAGR", f"{m['cagr_pct']}%"),
+                        ("Sharpe", str(m['sharpe_ratio'])),
+                        ("Max DD", f"{m['max_drawdown_pct']}%"),
+                        ("Trades", str(tm['num_trades'])),
+                        ("Win Rate", f"{tm['win_rate']}%"),
+                        ("Profit Factor", str(tm['profit_factor'])),
+                        ("Final Value", f"${m['final_value']:,.0f}"),
+                    ]
+                    for i, (label, val) in enumerate(metrics_data):
+                        with cols[i % 4]:
+                            st.metric(label, val)
+                    if len(result.equity_curve) > 1:
+                        st.line_chart(pd.DataFrame({"equity": result.equity_curve}))
+                except Exception as e:
+                    st.error(f"Backtest failed: {e}")
 
 
 def _detect_available_providers() -> list[tuple[str, str]]:

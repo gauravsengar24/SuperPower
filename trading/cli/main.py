@@ -103,6 +103,8 @@ def backtest(
 ):
     """Run M.I.D.A.S. backtesting — test strategy across historical window."""
     from trading.backtesting.midas import MIDAS
+    import json
+    from pathlib import Path
 
     console.print(f"[bold]M.I.D.A.S. Backtest:[/bold] {ticker} {from_date} \u2192 {to_date}")
     console.print(f"  Initial cash: ${cash:,.0f} | Interval: {interval}d")
@@ -117,6 +119,12 @@ def backtest(
     with console.status("[bold green]Running backtest...[/bold green]") as status:
         result = engine.run(ticker, from_date, to_date,
                             interval_days=interval)
+
+    results_dir = Path("~/.trading/backtest_results").expanduser()
+    results_dir.mkdir(parents=True, exist_ok=True)
+    slug = f"{ticker}_{from_date}_{to_date}".replace(".", "_")
+    (results_dir / f"{slug}.json").write_text(json.dumps(result.to_dict(), indent=2))
+    console.print(f"[dim]Saved to {results_dir / slug}.json[/dim]")
 
     console.print()
     m = result.metrics
