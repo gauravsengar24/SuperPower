@@ -215,7 +215,7 @@ def render_quick_analysis(trend: TREND):
 
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
-        search = st.text_input("Search ticker", value="", placeholder="Type ticker or company name...", key="ticker_search")
+        search = st.text_input("Search ticker or company", value="", placeholder="e.g. Apple, Reliance, MSFT...", key="ticker_search")
         q = search.strip().lower()
         if q:
             filtered = [lbl for lbl in ticker_all_labels if q in lbl.lower()]
@@ -230,7 +230,7 @@ def render_quick_analysis(trend: TREND):
             key="analysis_ticker",
         )
         ticker = ticker_all_map.get(selected_label, "AAPL")
-        st.caption(f"{len(ticker_all_labels):,} total tickers • showing {len(filtered):,}" if q else f"{len(ticker_all_labels):,} total tickers")
+        st.caption(f"{len(ticker_all_labels):,} total" if not q else f"{len(filtered):,} matches of {len(ticker_all_labels):,}")
     with col2:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
         default_prov = list(provider_opts.keys())[0]
