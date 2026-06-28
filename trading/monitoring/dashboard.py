@@ -178,6 +178,39 @@ def render_backtest():
             st.error("Failed to load backtest result")
 
 
+POPULAR_TICKERS = [
+    # US Stocks
+    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK.B", "JPM", "V",
+    "JNJ", "WMT", "MA", "PG", "UNH", "HD", "DIS", "BAC", "ADBE", "CRM",
+    "NFLX", "CMCSA", "XOM", "VZ", "KO", "PEP", "INTC", "AMD", "PYPL", "UBER",
+    "SQ", "SNAP", "SHOP", "ZM", "DASH", "ABNB", "COIN", "RIVN", "LCID", "PLTR",
+    "SPY", "QQQ", "IWM", "DIA", "TLT", "GLD", "SLV", "USO",
+    # European Stocks
+    "SAP.DE", "SIE.DE", "ALV.DE", "DBK.DE", "BAS.DE", "BAYN.DE", "BMW.DE",
+    "DAI.DE", "VOW3.DE", "ADS.DE", "MRK.DE", "MUV2.DE", "RWE.DE", "EOAN.DE",
+    "MC.PA", "OR.PA", "TTE.PA", "SAN.PA", "BN.PA", "AI.PA", "SU.PA",
+    "RMS.PA", "LR.PA", "VIE.PA", "KER.PA", "DG.PA",
+    "ULVR.L", "AZN.L", "SHEL.L", "HSBA.L", "BP.L", "GSK.L", "RIO.L",
+    "BARC.L", "LLOY.L", "VOD.L", "BT-A.L", "TSCO.L", "DGE.L",
+    "ASML.AS", "ADYEN.AS", "INGA.AS", "PHIA.AS", "ABN.AS",
+    "ENEL.MI", "ENI.MI", "UCG.MI", "ISP.MI", "STLA.MI",
+    "NOVO-B.CO", "DSV.CO", "MAERSK-B.CO", "VWS.CO",
+    "NESN.SW", "NOVN.SW", "ROG.SW", "UBSG.SW", "ABBN.SW",
+    # Indian Stocks (NSE)
+    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
+    "BHARTIARTL.NS", "SBIN.NS", "WIPRO.NS", "HCLTECH.NS", "LT.NS",
+    "HINDUNILVR.NS", "ITC.NS", "BAJFINANCE.NS", "ASIANPAINT.NS", "MARUTI.NS",
+    "TITAN.NS", "SUNPHARMA.NS", "TATAMOTORS.NS", "TATASTEEL.NS", "NTPC.NS",
+    "ONGC.NS", "COALINDIA.NS", "POWERGRID.NS", "M&M.NS", "AXISBANK.NS",
+    "KOTAKBANK.NS", "ULTRACEMCO.NS", "BAJAJFINSV.NS", "NESTLEIND.NS", "HDFC.NS",
+    "ADANIENT.NS", "ADANIPORTS.NS", "DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS",
+    "APOLLOHOSP.NS", "TECHM.NS", "BRITANNIA.NS", "BAJAJ-AUTO.NS", "HEROMOTOCO.NS",
+    "EICHERMOT.NS", "ABB.NS", "SIEMENS.NS", "PIDILITIND.NS", "GRASIM.NS",
+    "JSWSTEEL.NS", "HINDALCO.NS", "TATACONSUM.NS", "DABUR.NS", "MARICO.NS",
+    "NIFTYBEES.NS", "JUNIORBEES.NS", "BANKBEES.NS",
+]
+
+
 def _detect_available_providers() -> list[tuple[str, str]]:
     providers = []
     if os.environ.get("OPENAI_API_KEY"):
@@ -202,7 +235,12 @@ def render_quick_analysis(trend: TREND):
 
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
-        ticker = st.text_input("Ticker", value="AAPL", key="analysis_ticker")
+        ticker = st.selectbox(
+            "Ticker",
+            POPULAR_TICKERS,
+            index=0,
+            key="analysis_ticker",
+        )
     with col2:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
         default_prov = list(provider_opts.keys())[0]
