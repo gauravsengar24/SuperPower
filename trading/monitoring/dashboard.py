@@ -68,21 +68,36 @@ def load_portfolio() -> Optional[ARCANE]:
 
 def render_provider_health(trend: TREND):
     st.subheader("Provider Health")
-    summary = trend.get_summary()
-    cols = st.columns(len(summary["provider_stats"]))
-    for i, stat in enumerate(summary["provider_stats"]):
+    try:
+        summary = trend.get_summary()
+    except Exception:
+        st.warning("Provider health data unavailable")
+        return
+    provider_stats = summary.get("provider_stats", []) if isinstance(summary, dict) else []
+    if not provider_stats:
+        st.info("No provider data yet. Make an analysis call first.")
+        return
+    cols = st.columns(len(provider_stats))
+    for i, stat in enumerate(provider_stats):
         with cols[i]:
-            is_active = stat["provider"] == summary["current_provider"]
+            is_active = stat.get("provider", "") == summary.get("current_provider", "")
             status = "● ACTIVE" if is_active else "○ STANDBY"
             color = "#00d4aa" if is_active else "#666"
+            prov_name = stat.get("provider", "?").upper() if isinstance(stat, dict) else "?"
+            calls = stat.get("calls", 0) if isinstance(stat, dict) else 0
+            sr = stat.get("success_rate", 0.0) if isinstance(stat, dict) else 0.0
+            avg = stat.get("avg_duration_ms", 0) if isinstance(stat, dict) else 0
+            toks = stat.get("total_tokens", 0) if isinstance(stat, dict) else 0
+            pct = f"{sr * 100:.0f}%" if isinstance(sr, (int, float)) else "0%"
+            avg_ms = f"{avg:.0f}ms" if isinstance(avg, (int, float)) else "0ms"
             st.markdown(
                 f'<div class="metric-card" style="border-color: {color}">'
-                f'<div class="metric-label">{stat.get("provider", "?").upper()}</div>'
+                f'<div class="metric-label">{prov_name}</div>'
                 f'<div class="metric-value" style="font-size:1rem;color:{color}">{status}</div>'
-                f'<div style="margin-top:8px">Calls: {stat.get("calls", 0)}</div>'
-                f'<div>Success: {stat.get("success_rate", 0):.0%}</div>'
-                f'<div>Avg: {stat.get("avg_duration_ms", 0):.0f}ms</div>'
-                f'<div>Tokens: {stat.get("total_tokens", 0)}</div>'
+                f'<div style="margin-top:8px">Calls: {calls}</div>'
+                f"<div>Success: {pct}</div>"
+                f"<div>Avg: {avg_ms}</div>"
+                f"<div>Tokens: {toks}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
