@@ -52,7 +52,7 @@ class PortfolioPosition:
 
 
 class PortfolioState:
-    def __init__(self, initial_cash: float = 100_000.0):
+    def __init__(self, initial_cash: float = 10_000.0):
         self.initial_cash = initial_cash
         self.cash = initial_cash
         self.positions: dict[str, PortfolioPosition] = {}
@@ -138,7 +138,7 @@ class ARCANE:
         self.config = config or {}
         self.state_path = Path(state_path or "~/.trading/portfolio/state.json").expanduser()
         self.portfolio = PortfolioState(
-            initial_cash=self.config.get("initial_cash", 100_000.0)
+            initial_cash=self.config.get("initial_cash", 10_000.0)
         )
         self._load_state()
 
