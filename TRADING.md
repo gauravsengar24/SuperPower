@@ -19,7 +19,7 @@
 | **H.E.R.M.E.S.** | Paper trading bridge | 🚧 Planned |
 | **S.I.G.M.A.** | Signal processing + test coverage | ✅ Ported |
 | **Q.U.A.N.T.** | LLM provider routing — cost-optimized model dispatch | ✅ Ported |
-| **J.A.N.U.S.** | Dashboard — real-time P&L, decisions, risk state | 🚧 Planned |
+| **T.R.E.N.D.** | Dashboard — real-time P&L, decisions, risk state | ✅ Done |
 | **P.L.U.T.O.** | CI/CD — GitHub Actions, Docker, deployment | 🔧 In progress |
 
 ---
@@ -103,7 +103,7 @@ trading/
 ├── data/                     # [R.A.P.T.O.R.] Market data feeds
 ├── portfolio/                # [A.R.C.A.N.E.] Portfolio tracking
 ├── backtesting/              # [M.I.D.A.S.] Backtest engine
-├── monitoring/               # [J.A.N.U.S.] Model monitoring
+├── monitoring/               # [T.R.E.N.D.] Model & provider monitoring
 ├── cli/                      # Command-line interface
 ├── tests/                    # All tests
 └── default_config.py         # Single source of config truth
