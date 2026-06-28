@@ -17,6 +17,7 @@ import pandas as pd
 from trading.monitoring.trend import TREND
 from trading.portfolio.arcane import ARCANE
 from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
+from trading.ticker_universe import get_all_tickers, format_ticker_display
 
 try:  # noqa: E402
     from langchain_core.messages import HumanMessage
@@ -178,39 +179,6 @@ def render_backtest():
             st.error("Failed to load backtest result")
 
 
-POPULAR_TICKERS = [
-    # US Stocks
-    "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK.B", "JPM", "V",
-    "JNJ", "WMT", "MA", "PG", "UNH", "HD", "DIS", "BAC", "ADBE", "CRM",
-    "NFLX", "CMCSA", "XOM", "VZ", "KO", "PEP", "INTC", "AMD", "PYPL", "UBER",
-    "SQ", "SNAP", "SHOP", "ZM", "DASH", "ABNB", "COIN", "RIVN", "LCID", "PLTR",
-    "SPY", "QQQ", "IWM", "DIA", "TLT", "GLD", "SLV", "USO",
-    # European Stocks
-    "SAP.DE", "SIE.DE", "ALV.DE", "DBK.DE", "BAS.DE", "BAYN.DE", "BMW.DE",
-    "DAI.DE", "VOW3.DE", "ADS.DE", "MRK.DE", "MUV2.DE", "RWE.DE", "EOAN.DE",
-    "MC.PA", "OR.PA", "TTE.PA", "SAN.PA", "BN.PA", "AI.PA", "SU.PA",
-    "RMS.PA", "LR.PA", "VIE.PA", "KER.PA", "DG.PA",
-    "ULVR.L", "AZN.L", "SHEL.L", "HSBA.L", "BP.L", "GSK.L", "RIO.L",
-    "BARC.L", "LLOY.L", "VOD.L", "BT-A.L", "TSCO.L", "DGE.L",
-    "ASML.AS", "ADYEN.AS", "INGA.AS", "PHIA.AS", "ABN.AS",
-    "ENEL.MI", "ENI.MI", "UCG.MI", "ISP.MI", "STLA.MI",
-    "NOVO-B.CO", "DSV.CO", "MAERSK-B.CO", "VWS.CO",
-    "NESN.SW", "NOVN.SW", "ROG.SW", "UBSG.SW", "ABBN.SW",
-    # Indian Stocks (NSE)
-    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "INFY.NS", "ICICIBANK.NS",
-    "BHARTIARTL.NS", "SBIN.NS", "WIPRO.NS", "HCLTECH.NS", "LT.NS",
-    "HINDUNILVR.NS", "ITC.NS", "BAJFINANCE.NS", "ASIANPAINT.NS", "MARUTI.NS",
-    "TITAN.NS", "SUNPHARMA.NS", "TATAMOTORS.NS", "TATASTEEL.NS", "NTPC.NS",
-    "ONGC.NS", "COALINDIA.NS", "POWERGRID.NS", "M&M.NS", "AXISBANK.NS",
-    "KOTAKBANK.NS", "ULTRACEMCO.NS", "BAJAJFINSV.NS", "NESTLEIND.NS", "HDFC.NS",
-    "ADANIENT.NS", "ADANIPORTS.NS", "DRREDDY.NS", "CIPLA.NS", "DIVISLAB.NS",
-    "APOLLOHOSP.NS", "TECHM.NS", "BRITANNIA.NS", "BAJAJ-AUTO.NS", "HEROMOTOCO.NS",
-    "EICHERMOT.NS", "ABB.NS", "SIEMENS.NS", "PIDILITIND.NS", "GRASIM.NS",
-    "JSWSTEEL.NS", "HINDALCO.NS", "TATACONSUM.NS", "DABUR.NS", "MARICO.NS",
-    "NIFTYBEES.NS", "JUNIORBEES.NS", "BANKBEES.NS",
-]
-
-
 def _detect_available_providers() -> list[tuple[str, str]]:
     providers = []
     if os.environ.get("OPENAI_API_KEY"):
@@ -233,14 +201,40 @@ def render_quick_analysis(trend: TREND):
         st.info("No API keys configured. Set OPENAI_API_KEY (or ANTHROPIC_API_KEY / GOOGLE_API_KEY) in Streamlit Secrets or .env to run live analysis.")
         return
 
+    if "ticker_universe" not in st.session_state:
+        with st.spinner("Loading ticker universe..."):
+            st.session_state.ticker_universe = get_all_tickers()
+            st.session_state.ticker_labels = {
+                format_ticker_display(t): t["ticker"] for t in st.session_state.ticker_universe
+            }
+    universe = st.session_state.ticker_universe
+    labels = st.session_state.ticker_labels
+
     col1, col2, col3 = st.columns([2, 2, 1])
     with col1:
-        ticker = st.selectbox(
+        search = st.text_input("Search ticker", value="", placeholder="Type to search...", key="analysis_search")
+        if search.strip():
+            q = search.strip().upper()
+            matches = [
+                (fmt, tkr) for fmt, tkr in labels.items()
+                if q in fmt.upper()
+            ][:100]
+            if not matches:
+                matches = list(labels.items())[:100]
+        else:
+            matches = list(labels.items())[:100]
+        display_opts = [m[0] for m in matches]
+        ticker_map = dict(matches)
+        if not display_opts:
+            display_opts = ["AAPL — Apple Inc. (NASDAQ)"]
+            ticker_map = {"AAPL — Apple Inc. (NASDAQ)": "AAPL"}
+        selected_label = st.selectbox(
             "Ticker",
-            POPULAR_TICKERS,
-            index=0,
+            display_opts,
+            index=0 if display_opts else None,
             key="analysis_ticker",
         )
+        ticker = ticker_map.get(selected_label, matches[0][1] if matches else "AAPL")
     with col2:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
         default_prov = list(provider_opts.keys())[0]
@@ -333,6 +327,12 @@ def run_dashboard(host: str = "0.0.0.0", port: int = 8501):
                 st.success(f"✅ {prov.upper()} ({model})")
         else:
             st.warning("No API keys configured")
+        if "ticker_universe" in st.session_state:
+            count = len(st.session_state.ticker_universe)
+            ticker_str = f"| {count:,} tickers loaded"
+            if count > 10000:
+                ticker_str += " (US + EU + IN)"
+            st.caption(ticker_str)
         st.divider()
         st.markdown("### Quickstart")
         st.code("trading analyze AAPL")
