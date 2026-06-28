@@ -642,7 +642,7 @@ def _save_cache(tickers: list[dict]):
 def get_all_tickers(force_refresh: bool = False) -> list[dict]:
     if not force_refresh:
         cached = _load_cache()
-        if cached is not None:
+        if cached:
             logger.info("Loaded %d tickers from cache", len(cached))
             return cached
 
