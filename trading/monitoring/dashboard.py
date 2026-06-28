@@ -7,7 +7,7 @@ and backtest results in a single-pane glassmorphism UI.
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -18,7 +18,7 @@ from trading.monitoring.trend import TREND
 from trading.portfolio.arcane import ARCANE
 from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
 
-try:
+try:  # noqa: E402
     from langchain_core.messages import HumanMessage
     from trading.llm_clients import create_llm_client
     HAS_LLM = True

@@ -7,11 +7,10 @@ tracks response times, and manages automatic provider fallback.
 """
 
 import logging
-import time
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from statistics import mean, stdev
+from statistics import mean
 from typing import Any
 
 logger = logging.getLogger(__name__)

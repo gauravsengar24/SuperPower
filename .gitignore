@@ -12,3 +12,7 @@ triage/
 # plugin, so the whole directory is ignored here.
 evals/
 trading/supertrading.egg-info/
+
+# Local config — contains API keys
+.env
+**/.trading/
