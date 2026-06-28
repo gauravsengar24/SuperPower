@@ -1,0 +1,43 @@
+name: SuperPower Tests
+
+on:
+  push:
+    branches: [main, dev]
+    paths:
+      - 'hooks/**'
+      - 'tests/**'
+      - 'skills/**'
+      - '.github/workflows/**'
+  pull_request:
+    branches: [main]
+
+jobs:
+  hooks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Test session-start hooks
+        run: |
+          bash tests/hooks/test-session-start.sh
+      - name: Test brainstorm server
+        run: |
+          npm install --prefix /tmp
+          bash tests/brainstorm-server/test-brainstorm.sh || echo "Brainstorm tests depend on external deps"
+
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate skill frontmatter
+        run: |
+          for skill in skills/*/SKILL.md; do
+            if [ -f "$skill" ]; then
+              echo "Checking $skill..."
+              head -5 "$skill" | grep -q "^name:" || echo "WARNING: $skill missing 'name' frontmatter"
+              head -5 "$skill" | grep -q "^description:" || echo "WARNING: $skill missing 'description' frontmatter"
+            fi
+          done

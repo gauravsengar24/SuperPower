@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "supertrading"
+version = "0.1.0"
+description = "SuperTrading AI — Multi-Agent Trading Platform"
+readme = "../TRADING.md"
+requires-python = ">=3.10"
+dependencies = [
+    "langchain-core>=0.3.81",
+    "langgraph>=0.4.8",
+    "langchain-openai>=0.3.23",
+    "langchain-anthropic>=0.3.15",
+    "langchain-google-genai>=4.0.0",
+    "pandas>=2.3.0",
+    "yfinance>=1.4.1",
+    "python-dotenv>=1.0.0",
+    "typer>=0.21.0",
+    "rich>=14.0.0",
+    "pydantic>=2.0",
+    "requests>=2.32",
+    "parsel>=1.10",
+    "stockstats>=0.6.5",
+    "backtrader>=1.9.78",
+    "tqdm>=4.67",
+    "pytz>=2025",
+    "typing-extensions>=4.14",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.15",
+    "pytest>=8.0",
+    "pytest-subtests>=0.13",
+    "pytest-cov>=5.0",
+    "mypy>=1.0",
+]
+alpaca = ["alpaca-py>=0.30"]
+ibkr = ["ib-api>=0.5"]
+all = ["supertrading[alpaca,ibkr,dev]"]
+
+[project.scripts]
+trading = "trading.cli.main:cli"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["trading*"]
+
+[tool.pytest.ini_options]
+testpaths = ["trading/tests"]
+addopts = "-ra -v --strict-markers"
+markers = [
+    "unit: fast isolated unit tests",
+    "integration: tests requiring external services",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "C4", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"**/__init__.py" = ["F401"]
+
+[tool.coverage.run]
+source = ["trading"]
+omit = ["trading/tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

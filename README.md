@@ -3,6 +3,25 @@
 Superpowers is a complete software development methodology for your coding agents, built on top of a set of composable skills and some initial instructions that make sure your agent uses them.
 
 
+## 🚀 SuperTrading AI — Multi-Agent Trading System
+
+> **Bots**: M.A.T.R.I.X. · A.E.G.I.S. · V.E.L.O.C.I.T.Y. · A.R.C.A.N.E. · R.A.P.T.O.R. · M.I.D.A.S. · H.E.R.M.E.S. · Q.U.A.N.T. · J.A.N.U.S. · S.I.G.M.A.
+>
+> **[Full Trading Docs → TRADING.md](TRADING.md)** · **[Architecture → docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** · **[Bug Tracker → docs/bugs/BUGS.md](docs/bugs/BUGS.md)**
+>
+> Built on [obra/superpowers](https://github.com/obra/superpowers) × [TauricResearch/TradingAgents](https://github.com/tauricresearch/tradingagents)
+
+```bash
+# Quick start
+git clone https://github.com/gauravsengar24/SuperPower.git
+cd SuperPower
+pip install -e trading/
+cp .env.example .env   # add your API keys
+trading analyze --ticker AAPL --date 2026-01-15
+```
+
+---
+
 ## We're Hiring!
 
 We're hiring someone to help out full time with Superpowers community and code work. 
