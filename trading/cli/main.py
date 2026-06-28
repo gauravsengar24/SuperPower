@@ -3,7 +3,7 @@
 Usage:
     trading analyze --ticker AAPL --date 2026-01-15
     trading dashboard
-    trading backtest --ticker AAPL --from 2020-01-01 --to 2023-12-31
+    trading backtest --ticker AAPL --from 2020-01-01  # --to defaults to today
     trading portfolio
     trading --help
 """
@@ -92,7 +92,10 @@ def analyze(
 def backtest(
     ticker: str = typer.Argument(..., help="Ticker to backtest"),
     from_date: str = typer.Option("2020-01-01", "--from", "-f", help="Start date"),
-    to_date: str = typer.Option("2023-12-31", "--to", "-t", help="End date"),
+    to_date: str = typer.Option(
+        datetime.now().strftime("%Y-%m-%d"), "--to", "-t",
+        help="End date (default: today)",
+    ),
     interval: int = typer.Option(30, "--interval", "-i", help="Days between analyses"),
     cash: float = typer.Option(100000.0, "--cash", "-c", help="Initial cash"),
     max_positions: int = typer.Option(10, "--max-positions", help="AEGIS max positions"),
