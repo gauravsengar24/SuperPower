@@ -121,7 +121,7 @@ trading/
 | 4 | Execution engine (VELOCITY) | ✅ Done — paper + Alpaca adapters |
 | 5 | Portfolio management (ARCANE) | ✅ Done — P&L, positions, metrics |
 | 6 | Backtesting (MIDAS) | ✅ Done — full engine, metrics (Sharpe/Sortino/drawdown/CAGR), CLI, 17 tests |
-| 7 | Dashboard + monitoring (JANUS) | ✅ Done — provider fallback + drift detection |
+| 7 | Dashboard + monitoring (TREND) | ✅ Done — Streamlit UI, provider health, portfolio viewer, backtest viewer |
 | 8 | Agent modules + test coverage | ✅ Done — 7 agent modules, 47 new tests (98 total) |
 | 9 | SuperPower trading skills | 📋 Planned |
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""J.A.N.U.S. — Joint Analytic Network for Underlying Signals.
+"""T.R.E.N.D. — Tactical Rick-Evaluation and Network Directed-trading.
 
 Monitors LLM provider health, detects drift in agent outputs,
 tracks response times, and manages automatic provider fallback.
@@ -28,7 +28,7 @@ class LLMCallRecord:
     timestamp: str = ""
 
 
-class JANUS:
+class TREND:
     def __init__(self, config: dict | None = None):
         self.config = config or {}
         self.records: list[LLMCallRecord] = []
@@ -69,14 +69,14 @@ class JANUS:
             next_idx = self.current_provider_idx + 1
             if next_idx < len(self.fallback_chain):
                 logger.warning(
-                    "JANUS fallback: %s → %s (after %d errors)",
+                    "TREND fallback: %s \u2192 %s (after %d errors)",
                     failed_provider,
                     self.fallback_chain[next_idx],
                     self.error_threshold,
                 )
                 self.current_provider_idx = next_idx
             else:
-                logger.error("JANUS: all providers exhausted!")
+                logger.error("TREND: all providers exhausted!")
                 self.current_provider_idx = 0
 
     def get_provider_stats(self, provider: str) -> dict:

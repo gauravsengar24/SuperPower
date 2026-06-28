@@ -1,2 +1,2 @@
-# JANUS — Joint Analytic Network for Underlying Signals
+# TREND — Tactical Rick-Evaluation and Network Directed-trading
 # Model monitoring, drift detection, alerts

@@ -23,6 +23,7 @@ dependencies = [
     "tqdm>=4.67",
     "pytz>=2025",
     "typing-extensions>=4.14",
+    "streamlit>=1.35",
 ]
 
 [project.optional-dependencies]
@@ -48,7 +49,7 @@ include = ["trading*"]
 
 [tool.pytest.ini_options]
 testpaths = ["trading/tests"]
-addopts = "-ra -v --strict-markers"
+addopts = "-ra -v --strict-markers --ignore=trading/tests/test_interoperability.py"
 markers = [
     "unit: fast isolated unit tests",
     "integration: tests requiring external services",

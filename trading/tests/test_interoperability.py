@@ -175,19 +175,19 @@ def test_portfolio():
     os.remove("/tmp/.trading_test_portfolio2.json")
 
 
-def test_janus():
-    from trading.monitoring.janus import JANUS
-    janus = JANUS()
-    janus.record_call("openai", "gpt-5.5", 1200, True, 500)
-    janus.record_call("openai", "gpt-5.5", 800, True, 300)
-    janus.record_call("openai", "gpt-5.5", 0, False, error="timeout")
-    janus.record_call("openai", "gpt-5.5", 0, False, error="timeout")
-    janus.record_call("openai", "gpt-5.5", 0, False, error="timeout")
-    summary = janus.get_summary()
+def test_trend():
+    from trading.monitoring.trend import TREND
+    trend = TREND()
+    trend.record_call("openai", "gpt-5.5", 1200, True, 500)
+    trend.record_call("openai", "gpt-5.5", 800, True, 300)
+    trend.record_call("openai", "gpt-5.5", 0, False, error="timeout")
+    trend.record_call("openai", "gpt-5.5", 0, False, error="timeout")
+    trend.record_call("openai", "gpt-5.5", 0, False, error="timeout")
+    summary = trend.get_summary()
     assert summary["total_calls"] == 5
     assert summary["total_errors"] == 3
     assert summary["current_provider"] != "openai"
-    print(f"  ✅ Fallback: {summary['current_provider']} after {summary['total_errors']} errors")
+    print(f"  \u2705 Fallback: {summary['current_provider']} after {summary['total_errors']} errors")
 
 
 def test_cli():
@@ -195,6 +195,9 @@ def test_cli():
     from trading.cli.main import cli
     runner = CliRunner()
     result = runner.invoke(cli, ["version"])
+    assert result.exit_code == 0
+    assert "SuperTrading AI" in result.output
+    result = runner.invoke(cli, ["--help"])
     assert result.exit_code == 0
     assert "SuperTrading AI" in result.output
     result = runner.invoke(cli, ["--help"])
@@ -235,7 +238,7 @@ tests = [
     ("5f", "Report writing", test_reporting),
     ("5g", "AEGIS + VELOCITY + Hermes", test_execution_chain),
     ("5h", "ARCANE portfolio management", test_portfolio),
-    ("5i", "JANUS provider monitoring", test_janus),
+    ("5i", "TREND provider monitoring", test_trend),
     ("5j", "CLI commands", test_cli),
     ("5k", "Symbol utilities + path safety", test_symbols),
     ("5l", "Config env-var overrides", test_config_env_overrides),

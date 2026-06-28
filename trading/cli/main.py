@@ -139,9 +139,10 @@ def dashboard(
     port: int = typer.Option(8501, "--port", "-p", help="Dashboard port"),
     host: str = typer.Option("0.0.0.0", "--host", "-h", help="Dashboard host"),
 ):
-    """Launch the J.A.N.U.S. monitoring dashboard."""
-    console.print(f"[bold]J.A.N.U.S. Dashboard:[/bold] http://{host}:{port}")
-    console.print("[yellow]Dashboard coming in Phase 7 — stay tuned[/yellow]")
+    """Launch the T.R.E.N.D. monitoring dashboard."""
+    console.print(f"[bold]T.R.E.N.D. Dashboard:[/bold] http://{host}:{port}")
+    from trading.monitoring.dashboard import run_dashboard
+    run_dashboard(host=host, port=port)
 
 
 @cli.command()
