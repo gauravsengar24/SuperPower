@@ -43,14 +43,17 @@ ANALYST_FUNDAMENTALS = "fundamentals"
 
 
 def _get_macro_indicators(*args, **kwargs):
-    return "Macro indicators not yet implemented"
+    """Fetch macro-economic indicators for the given context."""
+    return "Macro indicators data — coming in Phase 5"
 
 
 def _get_prediction_markets(*args, **kwargs):
-    return "Prediction markets not yet implemented"
+    """Fetch prediction market data (Polymarket) for the given ticker."""
+    return "Prediction markets data — coming in Phase 5"
 
 
 def _get_verified_market_snapshot(symbol, curr_date):
+    """Fetch the deterministic verified OHLCV snapshot for ground truth."""
     from trading.dataflows.market_data_validator import build_verified_market_snapshot
     return str(build_verified_market_snapshot(symbol, curr_date))
 
@@ -66,30 +69,35 @@ class TradingAgentsGraph:
         Path(self.config["results_dir"]).mkdir(parents=True, exist_ok=True)
         Path(self.config["data_cache_dir"]).mkdir(parents=True, exist_ok=True)
 
-        llm_kwargs = self._get_provider_kwargs()
+        self._llm_kwargs = self._get_provider_kwargs()
         if self.callbacks:
-            llm_kwargs["callbacks"] = self.callbacks
+            self._llm_kwargs["callbacks"] = self.callbacks
 
-        self.deep_thinking_llm = create_llm_client(
+        self._deep_client = create_llm_client(
             provider=self.config["llm_provider"],
             model=self.config["deep_think_llm"],
             base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        ).get_llm()
-
-        self.quick_thinking_llm = create_llm_client(
+            **self._llm_kwargs,
+        )
+        self._quick_client = create_llm_client(
             provider=self.config["llm_provider"],
             model=self.config["quick_think_llm"],
             base_url=self.config.get("backend_url"),
-            **llm_kwargs,
-        ).get_llm()
+            **self._llm_kwargs,
+        )
 
         self.memory_log = TradingMemoryLog(self.config)
         self.tool_nodes = self._create_tool_nodes()
-        self.signal_processor = SignalProcessor(self.quick_thinking_llm)
+        self.signal_processor = SignalProcessor()
         self.curr_state = None
         self.ticker = None
         self.selected_analysts = selected_analysts
+
+    def _get_deep_llm(self):
+        return self._deep_client.get_llm()
+
+    def _get_quick_llm(self):
+        return self._quick_client.get_llm()
 
     def _get_provider_kwargs(self):
         kwargs = {}
@@ -163,7 +171,7 @@ class TradingAgentsGraph:
         from trading.graph.setup import run_simple_analyst_chain
         return run_simple_analyst_chain(
             state, self.selected_analysts,
-            self.quick_thinking_llm, self.deep_thinking_llm,
+            self._get_quick_llm(), self._get_deep_llm(),
             self.tool_nodes,
         )
 

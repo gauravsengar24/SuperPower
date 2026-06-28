@@ -56,6 +56,14 @@ def _coerce(value: str, reference):
         return int(value)
     if isinstance(reference, float):
         return float(value)
+    if reference is None:
+        stripped = value.strip()
+        try:
+            if "." in stripped or "e" in stripped.lower():
+                return float(stripped)
+            return int(stripped)
+        except (ValueError, TypeError):
+            pass
     return value
 
 

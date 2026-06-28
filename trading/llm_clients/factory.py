@@ -31,23 +31,18 @@ def create_llm_client(provider: str, model: str, base_url: str | None = None,
     client_type = _resolve_provider(provider)
 
     if client_type == "openai":
-        from .openai_client import OpenAIClient
         return OpenAIClient(model=model, base_url=base_url, **kwargs)
 
     elif client_type == "anthropic":
-        from .anthropic_client import AnthropicClient
         return AnthropicClient(model=model, base_url=base_url, **kwargs)
 
     elif client_type == "google":
-        from .google_client import GoogleClient
         return GoogleClient(model=model, base_url=base_url, **kwargs)
 
     elif client_type == "azure":
-        from .azure_client import AzureOpenAIClient
         return AzureOpenAIClient(model=model, base_url=base_url, **kwargs)
 
     elif client_type == "bedrock":
-        from .bedrock_client import BedrockClient
         return BedrockClient(model=model, **kwargs)
 
     else:

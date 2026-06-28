@@ -45,6 +45,7 @@ def get_indicators(symbol: str, indicator: str, curr_date: str, look_back_days: 
 
 
 def get_fundamentals(symbol: str) -> dict:
+    """Fetch fundamental data (PE, market cap, EPS, etc.)."""
     try:
         info = yf.Ticker(symbol).info or {}
         return {
@@ -69,6 +70,7 @@ def get_fundamentals(symbol: str) -> dict:
 
 
 def get_balance_sheet(symbol: str) -> dict:
+    """Fetch balance sheet data from yfinance."""
     try:
         ticker = yf.Ticker(symbol)
         bs = ticker.balance_sheet
@@ -81,6 +83,7 @@ def get_balance_sheet(symbol: str) -> dict:
 
 
 def get_cashflow(symbol: str) -> dict:
+    """Fetch cash flow statement from yfinance."""
     try:
         ticker = yf.Ticker(symbol)
         cf = ticker.cashflow
@@ -93,6 +96,7 @@ def get_cashflow(symbol: str) -> dict:
 
 
 def get_income_statement(symbol: str) -> dict:
+    """Fetch income statement from yfinance."""
     try:
         ticker = yf.Ticker(symbol)
         inc = ticker.income_stmt
@@ -105,6 +109,7 @@ def get_income_statement(symbol: str) -> dict:
 
 
 def get_insider_transactions(symbol: str) -> list[dict]:
+    """Fetch recent insider transactions from yfinance."""
     try:
         ticker = yf.Ticker(symbol)
         insiders = ticker.insider_transactions

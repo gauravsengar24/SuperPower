@@ -31,3 +31,11 @@ def normalize_symbol(symbol: str) -> str:
 def is_yahoo_safe(symbol: str) -> bool:
     """Check if the symbol contains path-traversal characters."""
     return bool(_SAFE_TICKER.match(symbol)) and ".." not in symbol and "/" not in symbol
+
+
+def safe_ticker_component(ticker: str) -> str:
+    """Sanitize ticker for use as a filesystem path component."""
+    safe = re.sub(r'[^A-Z0-9.\-^=]', '_', ticker.upper())
+    if not safe or safe == "." or safe == "..":
+        return "UNKNOWN"
+    return safe
