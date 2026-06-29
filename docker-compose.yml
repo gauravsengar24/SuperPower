@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  trading:
+    build: .
+    ports:
+      - "8501:8501"
+    volumes:
+      - ~/.trading:/root/.trading
+    env_file:
+      - .env
+    environment:
+      - STREAMLIT_SERVER_PORT=8501
+      - STREAMLIT_SERVER_ADDRESS=0.0.0.0
+    command: ["dashboard"]
+
+  backtest:
+    build: .
+    profiles: ["cli"]
+    volumes:
+      - ~/.trading:/root/.trading
+      - .:/app
+    env_file:
+      - .env
+    entrypoint: ["trading", "backtest"]

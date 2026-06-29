@@ -1,8 +1,9 @@
-from __future__ import annotations
-
 """Agent state TypedDicts for the LangGraph pipeline."""
 
-from typing import Any, Sequence
+from __future__ import annotations
+
+from collections.abc import Sequence
+from typing import Any
 
 from langchain_core.messages import BaseMessage
 from typing_extensions import TypedDict
@@ -45,4 +46,5 @@ class AgentState(TypedDict, total=False):
 
     investment_plan: Any
     trader_investment_plan: str
+    portfolio_decision: Any
     final_trade_decision: str
