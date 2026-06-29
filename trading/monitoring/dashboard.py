@@ -825,14 +825,106 @@ def render_provider_panel(trend: TREND):
     st.markdown(f'<div class="glass-card">{rows_html}</div>', unsafe_allow_html=True)
 
 
+def _live_trade(ticker, broker, velocity, state_path, side_opt="Auto (SMA Crossover)"):
+    import yfinance as yf
+    try:
+        df = yf.download(ticker, period="5d", progress=False)
+        if df.empty:
+            return
+        price = float(df["Close"].iloc[-1])
+        broker.update_price(ticker, price)
+        if side_opt == "Auto (SMA Crossover)":
+            sma_20 = float(df["Close"].tail(20).mean()) if len(df) >= 20 else price
+            sma_50 = float(df["Close"].tail(50).mean()) if len(df) >= 50 else price
+            side = "buy" if sma_20 > sma_50 else "sell" if sma_20 < sma_50 else "hold"
+        elif side_opt == "Buy Only":
+            side = "buy"
+        else:
+            side = "sell"
+        if side == "hold":
+            _live_save_state(broker, state_path)
+            return
+        acct = broker.get_account()
+        trade_qty = max(1, int((acct.cash * 0.5) / price))
+        velocity.execute(ticker, side=side, qty=trade_qty, order_type="market")
+        _live_save_state(broker, state_path)
+    except Exception:
+        pass
+
+
+def _live_save_state(broker, state_path):
+    try:
+        acct = broker.get_account()
+        positions = broker.get_positions()
+        data = {
+            "cash": acct.cash,
+            "portfolio_value": acct.portfolio_value,
+            "positions": [{"ticker": p.ticker, "qty": p.qty, "avg_price": p.avg_entry_price, "value": p.market_value, "pnl": p.unrealized_pnl} for p in positions],
+            "orders": len(broker.filled_orders),
+        }
+        state_path.write_text(json.dumps(data, indent=2))
+    except Exception:
+        pass
+
+
 def render_live_panel():
     st.markdown('<div class="section-title">Live Trading</div>', unsafe_allow_html=True)
     state_path = Path("~/.trading/live_state.json").expanduser()
-    if not state_path.exists():
-        st.info("No live trading data. Run `trading run AAPL` to start.")
+    state_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if "live_broker" not in st.session_state:
+        st.session_state.live_broker = None
+    if "live_velocity" not in st.session_state:
+        st.session_state.live_velocity = None
+
+    if not state_path.exists() or not st.session_state.live_broker:
+        st.markdown(
+            '<div class="glass-card" style="text-align:center;padding:1.5rem;">'
+            '<div class="metric-label" style="font-size:0.8rem;margin-bottom:0.8rem;">Start Paper Trading</div>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        col_a, col_b = st.columns([1, 1])
+        with col_a:
+            lt_ticker = st.text_input("Ticker", value="AAPL", key="lt_ticker", placeholder="e.g. AAPL")
+            lt_cash = st.number_input("Cash ($)", value=10_000, step=1_000, key="lt_cash")
+        with col_b:
+            lt_side = st.selectbox("Strategy", ["Auto (SMA Crossover)", "Buy Only", "Sell Only"], key="lt_side")
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Start Trading", type="primary", key="lt_start", use_container_width=True):
+                from trading.broker.paper import HermesPaperBroker
+                from trading.execution.velocity import VELOCITY
+                from trading.risk.aegis import AEGIS
+                broker = HermesPaperBroker(initial_cash=float(lt_cash))
+                aegis = AEGIS()
+                velocity = VELOCITY(broker=broker, aegis=aegis, paper_mode=True)
+                st.session_state.live_broker = broker
+                st.session_state.live_velocity = velocity
+                st.session_state.live_ticker = lt_ticker.strip().upper()
+                st.session_state.live_side = lt_side
+                _live_trade(st.session_state.live_ticker, broker, velocity, state_path, lt_side)
+                st.rerun()
         return
+
+    broker = st.session_state.live_broker
+    velocity = st.session_state.live_velocity
+    ticker = st.session_state.live_ticker
+
+    col_act, col_stop = st.columns([1, 1])
+    with col_act:
+        if st.button("Execute Next Trade", key="lt_trade", use_container_width=True):
+            _live_trade(ticker, broker, velocity, state_path, st.session_state.live_side)
+            st.rerun()
+    with col_stop:
+        if st.button("Stop Trading", key="lt_stop", use_container_width=True):
+            st.session_state.live_broker = None
+            st.session_state.live_velocity = None
+            with contextlib.suppress(Exception):
+                state_path.unlink()
+            st.rerun()
+
     try:
-        data = json.loads(state_path.read_text())
+        data = json.loads(state_path.read_text()) if state_path.exists() else {}
         pv = data.get("portfolio_value", 0)
         cash = data.get("cash", 0)
         orders = data.get("orders", 0)
