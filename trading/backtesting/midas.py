@@ -9,11 +9,14 @@ import logging
 from datetime import datetime, timedelta
 from typing import Callable, Optional
 
-from trading.broker.base import Order, OrderSide, OrderType, OrderStatus
+import pandas as pd
+from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
+from trading.broker.base import OrderSide, OrderStatus, OrderType
 from trading.broker.paper import HermesPaperBroker
 from trading.portfolio.arcane import PortfolioState
-from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
-from trading.risk.aegis import AEGIS, TradeProposal, PortfolioState as AEGISPortfolio, MarketSnapshot, Position as AEGISPosition
+from trading.risk.aegis import AEGIS, MarketSnapshot, TradeProposal
+from trading.risk.aegis import PortfolioState as AEGISPortfolio
+from trading.risk.aegis import Position as AEGISPosition
 
 logger = logging.getLogger(__name__)
 
@@ -119,7 +122,7 @@ class MIDAS:
         self.aegis_config = aegis_config or {}
         self.broker = broker or HermesPaperBroker()
         self.portfolio = PortfolioState(initial_cash=initial_cash)
-        self._hist_data: Optional["pd.DataFrame"] = None
+        self._hist_data: Optional[pd.DataFrame] = None
         self._price_cache: dict[str, dict[str, float]] = {}
 
     def run(self, ticker: str, start_date: str, end_date: str,
@@ -155,7 +158,6 @@ class MIDAS:
 
     def _load_data(self, ticker: str, dates: list[str]):
         try:
-            import pandas as pd
             import yfinance as yf
             first_dt = datetime.strptime(dates[0], "%Y-%m-%d")
             last_dt = datetime.strptime(dates[-1], "%Y-%m-%d")
@@ -217,7 +219,7 @@ class MIDAS:
             pos = self.portfolio.positions.get(ticker.upper())
             if pos and pos.qty > 0:
                 return {"action": "hold", "reason": "Already in position"}
-            allocation_pct = self.aegis_config.get("default_risk_per_trade", 0.95)
+            allocation_pct = 0.95
             max_allocation = self.portfolio.cash * allocation_pct
             if max_allocation <= 0:
                 return {"action": "skip", "reason": "Insufficient cash"}
@@ -239,7 +241,7 @@ class MIDAS:
             order_type=OrderType.MARKET,
         )
 
-        if order.status == OrderStatus.FILLED:
+        if order.status in (OrderStatus.FILLED, OrderStatus.PARTIALLY_FILLED):
             self.portfolio.apply_fill(order)
             price_used = order.avg_fill_price or price
             return {
