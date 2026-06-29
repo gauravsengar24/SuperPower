@@ -13,7 +13,7 @@ from trading.broker.base import Order, OrderSide, OrderType, OrderStatus
 from trading.broker.paper import HermesPaperBroker
 from trading.portfolio.arcane import PortfolioState
 from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
-from trading.risk.aegis import AEGIS, TradeProposal, PortfolioState as AEGISPortfolio, MarketSnapshot
+from trading.risk.aegis import AEGIS, TradeProposal, PortfolioState as AEGISPortfolio, MarketSnapshot, Position as AEGISPosition
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +119,7 @@ class MIDAS:
         self.aegis_config = aegis_config or {}
         self.broker = broker or HermesPaperBroker()
         self.portfolio = PortfolioState(initial_cash=initial_cash)
+        self._price_cache: dict[str, dict[str, float]] = {}
 
     def run(self, ticker: str, start_date: str, end_date: str,
             interval_days: int = 30, signal_func: Optional[SignalFunc] = None) -> BacktestResult:
@@ -128,6 +129,8 @@ class MIDAS:
 
         dates = self._generate_dates(start_date, end_date, interval_days)
         steps: list[BacktestStep] = []
+
+        self._load_price_cache(ticker, dates)
 
         for analysis_date in dates:
             signal = signal_func(ticker, analysis_date)
@@ -149,6 +152,30 @@ class MIDAS:
             steps=steps, initial_cash=self.initial_cash,
         )
 
+    def _load_price_cache(self, ticker: str, dates: list[str]):
+        try:
+            import yfinance as yf
+            cache = {}
+            end_dt = datetime.strptime(dates[-1], "%Y-%m-%d") + timedelta(days=1)
+            df = yf.download(ticker, start=dates[0], end=end_dt.strftime("%Y-%m-%d"), progress=False)
+            if df is not None and not df.empty:
+                closes = df["Close"]
+                for d in dates:
+                    try:
+                        dt = datetime.strptime(d, "%Y-%m-%d")
+                        if dt in closes.index:
+                            cache[d] = float(closes.loc[dt])
+                        else:
+                            prev = closes[:dt]
+                            if not prev.empty:
+                                cache[d] = float(prev.iloc[-1])
+                    except (ValueError, IndexError, TypeError):
+                        pass
+            self._price_cache[ticker] = cache
+        except Exception as e:
+            logger.warning("Failed to load price cache for %s: %s", ticker, e)
+            self._price_cache[ticker] = {}
+
     def _generate_dates(self, start: str, end: str, interval_days: int) -> list[str]:
         dates = []
         try:
@@ -162,15 +189,19 @@ class MIDAS:
         return dates
 
     def _update_prices(self, ticker: str, date: str):
-        try:
-            import yfinance as yf
-            df = yf.download(ticker, start=date, end=date, progress=False)
-            if not df.empty:
-                close = float(df["Close"].iloc[-1])
-                self.broker.update_price(ticker, close)
-                self.portfolio.update_prices({ticker: close})
-        except Exception as e:
-            logger.warning("Price fetch error for %s on %s: %s", ticker, date, e)
+        cache = self._price_cache.get(ticker, {})
+        close = cache.get(date)
+        if close is None:
+            try:
+                import yfinance as yf
+                df = yf.download(ticker, start=date, end=date, progress=False)
+                if df is not None and not df.empty:
+                    close = float(df["Close"].iloc[-1])
+            except Exception as e:
+                logger.warning("Price fetch error for %s on %s: %s", ticker, date, e)
+        if close is not None and close > 0:
+            self.broker.update_price(ticker, close)
+            self.portfolio.update_prices({ticker: close})
 
     def _execute_signal(self, ticker: str, signal: str, date: str) -> dict:
         action = self._signal_to_action(signal)
@@ -182,11 +213,14 @@ class MIDAS:
             return {"action": "skip", "reason": "No price data"}
 
         if action == "buy":
-            risk_pct = self.aegis_config.get("default_risk_per_trade", 0.02)
-            max_risk = self.portfolio.cash * risk_pct
-            if max_risk <= 0:
+            pos = self.portfolio.positions.get(ticker.upper())
+            if pos and pos.qty > 0:
+                return {"action": "hold", "reason": "Already in position"}
+            allocation_pct = self.aegis_config.get("default_risk_per_trade", 0.95)
+            max_allocation = self.portfolio.cash * allocation_pct
+            if max_allocation <= 0:
                 return {"action": "skip", "reason": "Insufficient cash"}
-            qty = max(1, int(max_risk / price))
+            qty = max(1, int(max_allocation / price))
         elif action == "sell":
             pos = self.portfolio.positions.get(ticker.upper())
             if not pos or pos.qty <= 0:
@@ -214,8 +248,17 @@ class MIDAS:
         return {"action": "failed", "reason": f"Order {order.status.name}: {order.reason}"}
 
     def _aegis_check(self, ticker: str, action: str, qty: int, price: float) -> bool:
+        if not self.aegis_config:
+            return True
+        positions_list = [
+            AEGISPosition(
+                ticker=t, qty=p.qty, avg_price=p.avg_price,
+                current_price=p.current_price, pnl=0.0, pnl_pct=0.0,
+            )
+            for t, p in self.portfolio.positions.items()
+        ]
         ps = AEGISPortfolio(
-            positions=[], cash=self.portfolio.cash,
+            positions=positions_list, cash=self.portfolio.cash,
             total_value=self.portfolio.total_value,
             peak_value=self.portfolio.peak_value,
             daily_start_value=self.portfolio.daily_start_value,
@@ -242,11 +285,18 @@ class MIDAS:
     def _default_signal(self, ticker: str, date: str) -> str:
         try:
             import yfinance as yf
-            df = yf.download(ticker, period="1y", progress=False)
-            if df.empty:
+            end = datetime.strptime(date, "%Y-%m-%d")
+            start = end - timedelta(days=400)
+            df = yf.download(ticker, start=start.strftime("%Y-%m-%d"), end=date, progress=False)
+            if df is None or df.empty:
                 return "HOLD"
-            close = float(df["Close"].iloc[-1])
-            sma200 = float(df["Close"].rolling(200).mean().iloc[-1])
+            close_series = df["Close"]
+            if close_series.empty:
+                return "HOLD"
+            close = float(close_series.iloc[-1])
+            if len(close_series) < 200:
+                return "HOLD"
+            sma200 = float(close_series.rolling(200).mean().iloc[-1])
             if sma200 != sma200 or sma200 == 0:
                 return "HOLD"
             if close < sma200 * 0.95:

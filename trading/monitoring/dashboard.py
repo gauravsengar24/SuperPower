@@ -79,7 +79,7 @@ def save_trend_state(trend: TREND):
 
 def load_portfolio() -> Optional[ARCANE]:
     try:
-        return ARCANE()
+        return ARCANE(config={"initial_cash": 10_000.0})
     except Exception:
         return None
 
@@ -160,12 +160,18 @@ def render_backtest():
         with col_b:
             bt_to = st.text_input("End date", value=datetime.now().strftime("%Y-%m-%d"), key="bt_to")
         with col_c:
-            bt_cash = st.number_input("Initial cash ($)", value=10_000_000, step=1_000_000, key="bt_cash")
+            bt_cash = st.number_input("Initial cash ($)", value=10_000, step=1_000, key="bt_cash")
         if st.button("Run Backtest", type="primary", key="bt_run"):
             from trading.backtesting.midas import MIDAS
             with st.spinner(f"Running backtest for {bt_ticker.strip().upper()}..."):
                 try:
-                    engine = MIDAS(initial_cash=float(bt_cash))
+                    engine = MIDAS(
+                        initial_cash=float(bt_cash),
+                        aegis_config={
+                            "max_daily_drawdown": 0.50,
+                            "max_trailing_drawdown": 0.75,
+                        },
+                    )
                     result = engine.run(bt_ticker.strip().upper(), bt_from, bt_to)
                     slug = f"{bt_ticker.strip().upper()}_{bt_from}_{bt_to}".replace(".", "_")
                     (results_dir / f"{slug}.json").write_text(json.dumps(result.to_dict(), indent=2))
