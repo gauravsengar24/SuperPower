@@ -119,10 +119,11 @@ class MIDAS:
         self.aegis_config = aegis_config or {}
         self.broker = broker or HermesPaperBroker()
         self.portfolio = PortfolioState(initial_cash=initial_cash)
+        self._hist_data: Optional["pd.DataFrame"] = None
         self._price_cache: dict[str, dict[str, float]] = {}
 
     def run(self, ticker: str, start_date: str, end_date: str,
-            interval_days: int = 30, signal_func: Optional[SignalFunc] = None) -> BacktestResult:
+            interval_days: int = 30, signal_func: Optional[SignalFunc] = None) -> "BacktestResult":
         """Run a backtest using a signal function."""
         if signal_func is None:
             signal_func = self._default_signal
@@ -130,11 +131,11 @@ class MIDAS:
         dates = self._generate_dates(start_date, end_date, interval_days)
         steps: list[BacktestStep] = []
 
-        self._load_price_cache(ticker, dates)
+        self._load_data(ticker, dates)
 
         for analysis_date in dates:
-            signal = signal_func(ticker, analysis_date)
             self._update_prices(ticker, analysis_date)
+            signal = signal_func(ticker, analysis_date)
             trade = self._execute_signal(ticker, signal, analysis_date)
 
             step = BacktestStep(
@@ -152,28 +153,33 @@ class MIDAS:
             steps=steps, initial_cash=self.initial_cash,
         )
 
-    def _load_price_cache(self, ticker: str, dates: list[str]):
+    def _load_data(self, ticker: str, dates: list[str]):
         try:
+            import pandas as pd
             import yfinance as yf
-            cache = {}
-            end_dt = datetime.strptime(dates[-1], "%Y-%m-%d") + timedelta(days=1)
-            df = yf.download(ticker, start=dates[0], end=end_dt.strftime("%Y-%m-%d"), progress=False)
+            first_dt = datetime.strptime(dates[0], "%Y-%m-%d")
+            last_dt = datetime.strptime(dates[-1], "%Y-%m-%d")
+            fetch_start = (first_dt - timedelta(days=400)).strftime("%Y-%m-%d")
+            fetch_end = (last_dt + timedelta(days=1)).strftime("%Y-%m-%d")
+            df = yf.download(ticker, start=fetch_start, end=fetch_end, progress=False, auto_adjust=True)
             if df is not None and not df.empty:
-                closes = df["Close"]
+                self._hist_data = df
+                closes = df["Close"] if "Close" in df.columns else df.iloc[:, 0]
+                cache = {}
                 for d in dates:
                     try:
                         dt = datetime.strptime(d, "%Y-%m-%d")
-                        if dt in closes.index:
-                            cache[d] = float(closes.loc[dt])
-                        else:
-                            prev = closes[:dt]
-                            if not prev.empty:
-                                cache[d] = float(prev.iloc[-1])
+                        exact = closes[closes.index <= dt]
+                        if not exact.empty:
+                            cache[d] = float(exact.iloc[-1])
                     except (ValueError, IndexError, TypeError):
                         pass
-            self._price_cache[ticker] = cache
+                self._price_cache[ticker] = cache
+            else:
+                logger.warning("No data returned for %s", ticker)
+                self._price_cache[ticker] = {}
         except Exception as e:
-            logger.warning("Failed to load price cache for %s: %s", ticker, e)
+            logger.warning("Failed to load data for %s: %s", ticker, e)
             self._price_cache[ticker] = {}
 
     def _generate_dates(self, start: str, end: str, interval_days: int) -> list[str]:
@@ -188,17 +194,12 @@ class MIDAS:
             logger.error("Invalid date format: %s", e)
         return dates
 
-    def _update_prices(self, ticker: str, date: str):
+    def _get_close(self, ticker: str, date: str) -> Optional[float]:
         cache = self._price_cache.get(ticker, {})
-        close = cache.get(date)
-        if close is None:
-            try:
-                import yfinance as yf
-                df = yf.download(ticker, start=date, end=date, progress=False)
-                if df is not None and not df.empty:
-                    close = float(df["Close"].iloc[-1])
-            except Exception as e:
-                logger.warning("Price fetch error for %s on %s: %s", ticker, date, e)
+        return cache.get(date)
+
+    def _update_prices(self, ticker: str, date: str):
+        close = self._get_close(ticker, date)
         if close is not None and close > 0:
             self.broker.update_price(ticker, close)
             self.portfolio.update_prices({ticker: close})
@@ -240,10 +241,11 @@ class MIDAS:
 
         if order.status == OrderStatus.FILLED:
             self.portfolio.apply_fill(order)
+            price_used = order.avg_fill_price or price
             return {
                 "action": action,
                 "qty": order.filled_qty,
-                "price": order.avg_fill_price or price,
+                "price": price_used,
             }
         return {"action": "failed", "reason": f"Order {order.status.name}: {order.reason}"}
 
@@ -283,20 +285,17 @@ class MIDAS:
         return "hold"
 
     def _default_signal(self, ticker: str, date: str) -> str:
+        if self._hist_data is None:
+            return "HOLD"
         try:
-            import yfinance as yf
-            end = datetime.strptime(date, "%Y-%m-%d")
-            start = end - timedelta(days=400)
-            df = yf.download(ticker, start=start.strftime("%Y-%m-%d"), end=date, progress=False)
-            if df is None or df.empty:
+            df = self._hist_data
+            closes = df["Close"] if "Close" in df.columns else df.iloc[:, 0]
+            dt = datetime.strptime(date, "%Y-%m-%d")
+            up_to_date = closes[closes.index <= dt]
+            if len(up_to_date) < 200:
                 return "HOLD"
-            close_series = df["Close"]
-            if close_series.empty:
-                return "HOLD"
-            close = float(close_series.iloc[-1])
-            if len(close_series) < 200:
-                return "HOLD"
-            sma200 = float(close_series.rolling(200).mean().iloc[-1])
+            close = float(up_to_date.iloc[-1])
+            sma200 = float(up_to_date.rolling(200).mean().iloc[-1])
             if sma200 != sma200 or sma200 == 0:
                 return "HOLD"
             if close < sma200 * 0.95:
