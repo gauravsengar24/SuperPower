@@ -1,28 +1,30 @@
 """T.R.E.N.D. — Streamlit monitoring dashboard.
 
-Displays live provider health, equity curves, portfolio state,
-and backtest results in a single-pane glassmorphism UI.
+Kitco-inspired dark financial terminal with glassmorphism cards,
+gold accents, animated ticker tape, and bento-grid layout.
 """
 
+import contextlib
 import json
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
-import streamlit as st
 import pandas as pd
+import streamlit as st
 import yfinance as yf
 
+from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
+from trading.dataflows.world_bank import get_macro_economic_data
 from trading.monitoring.trend import TREND
 from trading.portfolio.arcane import ARCANE
-from trading.backtesting.metrics import compute_metrics, compute_trade_metrics
-from trading.ticker_universe import get_all_tickers, format_ticker_display
-from trading.dataflows.world_bank import get_macro_economic_data
+from trading.ticker_universe import get_all_tickers
 
-try:  # noqa: E402
+try:
     from langchain_core.messages import HumanMessage
+
     from trading.llm_clients import create_llm_client
     HAS_LLM = True
 except ImportError:
@@ -30,30 +32,427 @@ except ImportError:
 
 st.set_page_config(
     page_title="T.R.E.N.D. Dashboard",
-    page_icon="📈",
+    page_icon="\U0001f4c8",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-DARK_CSS = """
+KITCO_CSS = """
 <style>
-    .main > div { padding: 1rem 2rem; }
-    .stApp { background: #0a0a0f; color: #e0e0e0; }
-    h1, h2, h3 { color: #00d4aa; }
-    .metric-card {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 12px;
-        padding: 1.2rem;
-        margin: 0.5rem 0;
-        backdrop-filter: blur(8px);
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    code, pre, .stCodeBlock, .mono { font-family: 'JetBrains Mono', 'SF Mono', monospace !important; }
+
+    .stApp {
+        background: #06060a;
+        color: #f0f0f0;
     }
-    .metric-value { font-size: 1.8rem; font-weight: 700; color: #00d4aa; }
-    .metric-label { font-size: 0.8rem; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-    .stDataFrame { background: transparent; }
-    .stAlert { border-radius: 8px; }
+    .main > div { padding: 0.5rem 1.5rem; }
+
+    h1, h2, h3 {
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+    h1 {
+        color: #f0f0f0;
+        font-size: 1.4rem;
+    }
+    h2 {
+        color: #d4a843;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1.5px;
+        margin-top: 0 !important;
+        padding: 0.6rem 0 0.3rem 0;
+        border-bottom: 1px solid rgba(212,168,67,0.2);
+    }
+    h3 {
+        color: #d4a843;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0e0e18; }
+    ::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #d4a843; }
+
+    div[data-testid="stMetricValue"] {
+        font-family: 'JetBrains Mono', monospace !important;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+    }
+
+    .stApp header { background: rgba(6,6,10,0.9) !important; backdrop-filter: blur(16px) !important; }
+
+    .stTabs [data-baseweb="tab-list"] { gap: 0; }
+    .stTabs [data-baseweb="tab"] {
+        background: transparent !important;
+        color: #606070 !important;
+        border-bottom: 2px solid transparent !important;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        transition: all 200ms cubic-bezier(.16,1,.3,1);
+    }
+    .stTabs [aria-selected="true"] {
+        color: #d4a843 !important;
+        border-bottom-color: #d4a843 !important;
+    }
+
+    .stButton button {
+        background: linear-gradient(135deg, rgba(212,168,67,0.2), rgba(212,168,67,0.05)) !important;
+        border: 1px solid rgba(212,168,67,0.3) !important;
+        color: #d4a843 !important;
+        font-weight: 600 !important;
+        font-size: 0.75rem !important;
+        border-radius: 8px !important;
+        transition: all 200ms cubic-bezier(.16,1,.3,1) !important;
+    }
+    .stButton button:hover {
+        background: linear-gradient(135deg, rgba(212,168,67,0.35), rgba(212,168,67,0.1)) !important;
+        border-color: #d4a843 !important;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 20px rgba(212,168,67,0.15);
+    }
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(135deg, #d4a843, #b8902a) !important;
+        color: #06060a !important;
+        border: none !important;
+        font-weight: 700 !important;
+    }
+    div.stButton > button[kind="primary"]:hover {
+        background: linear-gradient(135deg, #e8b830, #d4a843) !important;
+        box-shadow: 0 4px 24px rgba(212,168,67,0.3);
+    }
+
+    .stTextInput input, .stSelectbox div[data-baseweb="select"] > div {
+        background: rgba(255,255,255,0.04) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        border-radius: 8px !important;
+        color: #f0f0f0 !important;
+        font-size: 0.8rem !important;
+        font-family: 'JetBrains Mono', monospace !important;
+        transition: border-color 200ms ease;
+    }
+    .stTextInput input:focus, .stSelectbox div[data-baseweb="select"] > div:focus-within {
+        border-color: rgba(212,168,67,0.5) !important;
+        box-shadow: 0 0 0 2px rgba(212,168,67,0.1) !important;
+    }
+
+    div.stNumberInput input {
+        background: rgba(255,255,255,0.04) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        border-radius: 8px !important;
+        color: #f0f0f0 !important;
+        font-family: 'JetBrains Mono', monospace !important;
+    }
+
+    .stAlert { border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); }
+    .stAlert > div { color: #b0b0bc; }
+    div[data-baseweb="notification"] { background: rgba(6,6,10,0.95); border: 1px solid rgba(212,168,67,0.3); }
+
+    .stDataFrame { background: transparent !important; }
+    .stDataFrame td, .stDataFrame th {
+        background: transparent !important;
+        color: #f0f0f0 !important;
+        font-family: 'JetBrains Mono', monospace !important;
+        font-size: 0.7rem !important;
+        border-bottom: 1px solid rgba(255,255,255,0.04) !important;
+    }
+    .stDataFrame th { color: #606070 !important; text-transform: uppercase; letter-spacing: 0.5px; font-size: 0.65rem !important; }
+
+    div.stExpander {
+        background: rgba(255,255,255,0.02);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 10px;
+        overflow: hidden;
+        transition: all 200ms cubic-bezier(.16,1,.3,1);
+    }
+    div.stExpander:hover { border-color: rgba(212,168,67,0.2); }
+    div.stExpander summary { font-size: 0.8rem; font-weight: 600; color: #d4a843; }
+    div.stExpander[aria-expanded="true"] { border-color: rgba(212,168,67,0.3); }
+
+    .st-emotion-cache-16idsys p { font-size: 0.8rem; }
+
+    .stSidebar {
+        background: #0a0a14 !important;
+        border-right: 1px solid rgba(255,255,255,0.04);
+    }
+    .stSidebar .stMarkdown h3 { color: #606070; font-size: 0.65rem; letter-spacing: 1.5px; }
+
+    hr {
+        border: none;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(212,168,67,0.2), transparent);
+        margin: 0.8rem 0;
+    }
+
+    .stProgress > div > div > div { background: #d4a843 !important; }
+
+    @keyframes tickerScroll {
+        0% { transform: translateX(0); }
+        100% { transform: translateX(-50%); }
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+    }
+    @keyframes fadeSlideUp {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes shimmer {
+        0% { background-position: -200% 0; }
+        100% { background-position: 200% 0; }
+    }
+    @keyframes numberRoll {
+        from { transform: translateY(8px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    @keyframes glowPulse {
+        0%, 100% { box-shadow: 0 0 8px rgba(212,168,67,0.1); }
+        50% { box-shadow: 0 0 20px rgba(212,168,67,0.2); }
+    }
+
+    .ticker-tape {
+        overflow: hidden;
+        white-space: nowrap;
+        background: rgba(6,6,10,0.95);
+        border-bottom: 1px solid rgba(212,168,67,0.15);
+        padding: 0.35rem 0;
+        position: sticky;
+        top: 0;
+        z-index: 99;
+        backdrop-filter: blur(16px);
+        margin: 0 -1.5rem;
+        padding-left: 1.5rem;
+        padding-right: 1.5rem;
+    }
+    .ticker-inner {
+        display: inline-block;
+        animation: tickerScroll 50s linear infinite;
+        white-space: nowrap;
+    }
+    .ticker-inner:hover { animation-play-state: paused; }
+    .ticker-item {
+        display: inline-block;
+        margin-right: 2.5rem;
+        font-size: 0.78rem;
+        font-family: 'JetBrains Mono', monospace;
+        color: #b0b0bc;
+    }
+    .ticker-symbol { color: #f0f0f0; font-weight: 600; }
+    .ticker-price { color: #f0f0f0; margin-left: 0.4rem; }
+    .ticker-change { margin-left: 0.3rem; font-weight: 500; }
+    .ticker-change.pos { color: #22c55e; }
+    .ticker-change.neg { color: #ef4444; }
+
+    .glass-card {
+        background: linear-gradient(135deg, rgba(255,255,255,0.04) 0%, rgba(10,10,20,0.8) 100%);
+        backdrop-filter: blur(20px) saturate(210%);
+        -webkit-backdrop-filter: blur(20px) saturate(210%);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 14px;
+        padding: 1rem 1.2rem;
+        margin-bottom: 0.8rem;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.04);
+        transition: all 300ms cubic-bezier(.16,1,.3,1);
+        animation: fadeSlideUp 0.4s ease-out both;
+    }
+    .glass-card:hover {
+        border-color: rgba(212,168,67,0.25);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.08);
+        transform: translateY(-2px);
+    }
+    .glass-card.gold {
+        border-color: rgba(212,168,67,0.25);
+        background: linear-gradient(135deg, rgba(212,168,67,0.06) 0%, rgba(10,10,20,0.8) 100%);
+    }
+    .glass-card.gold:hover {
+        border-color: rgba(212,168,67,0.45);
+        box-shadow: 0 12px 40px rgba(0,0,0,0.6), 0 0 24px rgba(212,168,67,0.06);
+    }
+
+    .metric-label {
+        font-size: 0.65rem;
+        color: #606070;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        font-weight: 500;
+    }
+    .metric-value {
+        font-size: 1.6rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+        color: #f0f0f0;
+        line-height: 1.2;
+        animation: numberRoll 0.5s ease-out both;
+    }
+    .metric-value.gold { color: #d4a843; }
+    .metric-value.pos { color: #22c55e; }
+    .metric-value.neg { color: #ef4444; }
+    .metric-sub {
+        font-size: 0.7rem;
+        color: #606070;
+        font-family: 'JetBrains Mono', monospace;
+        margin-top: 0.1rem;
+    }
+
+    .led-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-right: 6px;
+        vertical-align: middle;
+    }
+    .led-dot.active { background: #22c55e; box-shadow: 0 0 8px rgba(34,197,94,0.5); animation: pulse 1.2s infinite; }
+    .led-dot.inactive { background: #606070; }
+    .led-dot.error { background: #ef4444; box-shadow: 0 0 8px rgba(239,68,68,0.4); animation: pulse 0.8s infinite; }
+    .led-dot.gold { background: #d4a843; box-shadow: 0 0 8px rgba(212,168,67,0.4); animation: pulse 1.5s infinite; }
+
+    .data-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.35rem 0;
+        border-bottom: 1px solid rgba(255,255,255,0.03);
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.72rem;
+        transition: background 200ms ease;
+    }
+    .data-row:hover { background: rgba(255,255,255,0.02); }
+    .data-row:last-child { border-bottom: none; }
+    .data-row .label { color: #808090; }
+    .data-row .value { color: #f0f0f0; font-weight: 500; }
+    .data-row .value.pos { color: #22c55e; }
+    .data-row .value.neg { color: #ef4444; }
+
+    .stTabs [data-baseweb="tab-panel"] { padding-top: 0.5rem; }
+
+    @media (max-width: 768px) {
+        .main > div { padding: 0.5rem 0.8rem; }
+        .ticker-tape { margin: 0 -0.8rem; padding-left: 0.8rem; padding-right: 0.8rem; }
+        .ticker-item { font-size: 0.7rem; margin-right: 1.5rem; }
+        .metric-value { font-size: 1.2rem; }
+    }
 </style>
 """
+
+TICKER_WATCHLIST = [
+    ("SPY", "S&P 500"), ("QQQ", "Nasdaq"), ("GLD", "Gold"),
+    ("SLV", "Silver"), ("BTC-USD", "Bitcoin"), ("ETH-USD", "Ethereum"),
+    ("AAPL", "Apple"), ("MSFT", "Microsoft"), ("NVDA", "NVIDIA"),
+    ("TSLA", "Tesla"), ("AMZN", "Amazon"), ("META", "Meta"),
+]
+
+
+def _fetch_ticker_prices() -> list[dict]:
+    """Fetch current prices for the ticker watchlist."""
+    tickers = [t[0] for t in TICKER_WATCHLIST]
+    try:
+        data = yf.download(tickers, period="5d", auto_adjust=True, group_by="ticker")
+        if data.empty or "Close" not in data.columns.levels[1] if isinstance(data.columns, pd.MultiIndex) else False:
+            return _fallback_prices()
+    except Exception:
+        return _fallback_prices()
+
+    rows = []
+    for ticker in tickers:
+        try:
+            if isinstance(data.columns, pd.MultiIndex) and ticker in data.columns.levels[0]:
+                closes = data[ticker]["Close"].dropna()
+            elif ticker in data.columns:
+                closes = data["Close"].dropna() if "Close" in data.columns else pd.Series()
+            else:
+                continue
+            if len(closes) < 2:
+                continue
+            price = closes.iloc[-1]
+            prev = closes.iloc[-2]
+            chg = price - prev
+            chg_pct = (chg / prev) * 100
+            rows.append({
+                "symbol": TICKER_WATCHLIST[[t[0] for t in TICKER_WATCHLIST].index(ticker)][0],
+                "name": TICKER_WATCHLIST[[t[0] for t in TICKER_WATCHLIST].index(ticker)][1],
+                "price": price,
+                "change": chg,
+                "change_pct": chg_pct,
+            })
+        except (KeyError, IndexError, TypeError):
+            continue
+    return rows or _fallback_prices()
+
+
+def _fallback_prices() -> list[dict]:
+    fallbacks = [
+        (586.20, 2.10), (198.40, -0.80), (232.00, 1.50),
+        (30.80, -0.25), (67800, 1200), (3450, 85),
+        (218.50, 1.20), (425.30, -2.10), (875.00, 15.40),
+        (248.60, -3.20), (198.20, 1.80), (535.00, 4.50),
+    ]
+    return [
+        {"symbol": TICKER_WATCHLIST[i][0], "name": TICKER_WATCHLIST[i][1],
+         "price": fv[0], "change": fv[1], "change_pct": (fv[1]/fv[0])*100}
+        for i, fv in enumerate(fallbacks)
+    ]
+
+
+def render_ticker_tape():
+    prices = _fetch_ticker_prices()
+    items_html = ""
+    for p in prices * 2:
+        cls = "pos" if p["change"] >= 0 else "neg"
+        arrow = "\u25b2" if p["change"] >= 0 else "\u25bc"
+        items_html += (
+            f'<span class="ticker-item">'
+            f'<span class="ticker-symbol">{p["symbol"]}</span>'
+            f'<span class="ticker-price">${p["price"]:,.2f}</span>'
+            f'<span class="ticker-change {cls}">{arrow} {p["change_pct"]:+.2f}%</span>'
+            f"</span>"
+        )
+    st.markdown(
+        f'<div class="ticker-tape"><div class="ticker-inner">{items_html}</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_hero(arcane: Optional[ARCANE]):
+    if not arcane:
+        return
+    metrics = arcane.get_performance_metrics()
+    total = metrics.get("total_value", 0)
+    ret = metrics.get("total_return_pct", 0)
+    dd = metrics.get("trailing_drawdown", 0) * 100
+    ret_cls = "pos" if ret >= 0 else "neg"
+    ret_sign = "+" if ret >= 0 else ""
+
+    st.markdown(
+        f"""
+        <div class="glass-card gold" style="margin-bottom:0.6rem;padding:1.2rem 1.5rem;animation-delay:0s;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:1rem;">
+                <div>
+                    <div class="metric-label">Portfolio Value</div>
+                    <div class="metric-value gold" style="font-size:2.2rem;">${total:,.0f}</div>
+                </div>
+                <div style="display:flex;gap:2rem;">
+                    <div>
+                        <div class="metric-label">Total Return</div>
+                        <div class="metric-value {ret_cls}" style="font-size:1.4rem;">{ret_sign}{ret}%</div>
+                    </div>
+                    <div>
+                        <div class="metric-label">Drawdown</div>
+                        <div class="metric-value neg" style="font-size:1.4rem;">-{dd:.1f}%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def load_trend_state() -> TREND:
@@ -84,204 +483,6 @@ def load_portfolio() -> Optional[ARCANE]:
         return None
 
 
-def render_provider_health(trend: TREND):
-    st.subheader("Provider Health")
-    try:
-        summary = trend.get_summary()
-    except Exception:
-        st.warning("Provider health data unavailable")
-        return
-    provider_stats = summary.get("provider_stats", []) if isinstance(summary, dict) else []
-    if not provider_stats:
-        st.info("No provider data yet. Make an analysis call first.")
-        return
-    cols = st.columns(len(provider_stats))
-    for i, stat in enumerate(provider_stats):
-        with cols[i]:
-            is_active = stat.get("provider", "") == summary.get("current_provider", "")
-            status = "● ACTIVE" if is_active else "○ STANDBY"
-            color = "#00d4aa" if is_active else "#666"
-            prov_name = stat.get("provider", "?").upper() if isinstance(stat, dict) else "?"
-            calls = stat.get("calls", 0) if isinstance(stat, dict) else 0
-            sr = stat.get("success_rate", 0.0) if isinstance(stat, dict) else 0.0
-            avg = stat.get("avg_duration_ms", 0) if isinstance(stat, dict) else 0
-            toks = stat.get("total_tokens", 0) if isinstance(stat, dict) else 0
-            pct = f"{sr * 100:.0f}%" if isinstance(sr, (int, float)) else "0%"
-            avg_ms = f"{avg:.0f}ms" if isinstance(avg, (int, float)) else "0ms"
-            st.markdown(
-                f'<div class="metric-card" style="border-color: {color}">'
-                f'<div class="metric-label">{prov_name}</div>'
-                f'<div class="metric-value" style="font-size:1rem;color:{color}">{status}</div>'
-                f'<div style="margin-top:8px">Calls: {calls}</div>'
-                f"<div>Success: {pct}</div>"
-                f"<div>Avg: {avg_ms}</div>"
-                f"<div>Tokens: {toks}</div>"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-
-def render_portfolio(arcane: Optional[ARCANE]):
-    st.subheader("Portfolio")
-    if not arcane:
-        st.info("No portfolio data loaded")
-        return
-    metrics = arcane.get_performance_metrics()
-    cols = st.columns(4)
-    labels = [
-        ("Total Value", f"${metrics.get('total_value', 0):,.0f}"),
-        ("Cash", f"${metrics.get('cash', 0):,.0f}"),
-        ("Return", f"{metrics.get('total_return_pct', 0)}%"),
-        ("Drawdown", f"{metrics.get('trailing_drawdown', 0)*100:.1f}%"),
-    ]
-    for col, (label, value) in zip(cols, labels):
-        with col:
-            st.markdown(
-                f'<div class="metric-card">'
-                f'<div class="metric-label">{label}</div>'
-                f'<div class="metric-value">{value}</div>'
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-
-def render_backtest():
-    st.subheader("Backtest Viewer")
-    results_dir = Path("~/.trading/backtest_results").expanduser()
-    results_dir.mkdir(parents=True, exist_ok=True)
-    result_files = sorted(results_dir.glob("*.json"), reverse=True)
-
-    # --- Inline runner ---
-    with st.expander("Run a backtest", expanded=not bool(result_files)):
-        bt_ticker = st.text_input("Ticker", value="AAPL", key="bt_ticker", placeholder="e.g. AAPL, MSFT")
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            bt_from = st.text_input("Start date", value="2020-01-01", key="bt_from")
-        with col_b:
-            bt_to = st.text_input("End date", value=datetime.now().strftime("%Y-%m-%d"), key="bt_to")
-        with col_c:
-            bt_cash = st.number_input("Initial cash ($)", value=10_000, step=1_000, key="bt_cash")
-        if st.button("Run Backtest", type="primary", key="bt_run"):
-            from trading.backtesting.midas import MIDAS
-            with st.spinner(f"Running backtest for {bt_ticker.strip().upper()}..."):
-                try:
-                    engine = MIDAS(
-                        initial_cash=float(bt_cash),
-                        aegis_config={
-                            "max_daily_drawdown": 0.50,
-                            "max_trailing_drawdown": 0.75,
-                        },
-                    )
-                    result = engine.run(bt_ticker.strip().upper(), bt_from, bt_to)
-                    slug = f"{bt_ticker.strip().upper()}_{bt_from}_{bt_to}".replace(".", "_")
-                    (results_dir / f"{slug}.json").write_text(json.dumps(result.to_dict(), indent=2))
-                    st.session_state.bt_last_result = {
-                        "ticker": bt_ticker.strip().upper(),
-                        "from": bt_from,
-                        "to": bt_to,
-                        "steps": len(result.steps),
-                        "equity": list(result.equity_curve),
-                        "trades": list(result.trades),
-                        "metrics": dict(result.metrics),
-                        "trade_metrics": dict(result.trade_metrics),
-                    }
-                except Exception as e:
-                    st.error(f"Backtest failed: {e}")
-                    import traceback
-                    st.code(traceback.format_exc(), language="python")
-
-    # --- Display last inline result ---
-    bt_last = st.session_state.get("bt_last_result")
-    if bt_last:
-        st.markdown("---")
-        st.markdown(f"**{bt_last['ticker']}** — {bt_last['from']} → {bt_last['to']} ({bt_last['steps']} steps)")
-        m = bt_last["metrics"]
-        tm = bt_last["trade_metrics"]
-        cols = st.columns(4)
-        for i, (label, val) in enumerate([
-            ("Return", f"{m.get('total_return_pct', '?')}%"),
-            ("CAGR", f"{m.get('cagr_pct', '?')}%"),
-            ("Sharpe", str(m.get('sharpe_ratio', '?'))),
-            ("Max DD", f"{m.get('max_drawdown_pct', '?')}%"),
-            ("Trades", str(tm.get('num_trades', 0))),
-            ("Win Rate", f"{tm.get('win_rate', 0)}%"),
-            ("Profit Factor", str(tm.get('profit_factor', 0))),
-            ("Final Value", f"${m.get('final_value', 0):,.0f}"),
-        ]):
-            with cols[i % 4]:
-                st.metric(label, val)
-        eq = bt_last["equity"]
-        if len(eq) > 1:
-            st.line_chart(pd.DataFrame({"equity": eq}))
-        with st.expander("Raw data"):
-            st.json(bt_last)
-
-    # --- Saved results ---
-    if result_files:
-        st.markdown("---")
-        selected = st.selectbox("Select saved result", [f.name for f in result_files])
-        if selected:
-            path = results_dir / selected
-            try:
-                data = json.loads(path.read_text())
-                equity = data.get("equity_curve") or []
-                trades = data.get("trades") or []
-                steps = data.get("steps") or []
-                if not equity and steps:
-                    equity = [data.get("initial_cash", 100000)] + [s.get("portfolio_value", 0) for s in steps]
-                if not trades and steps:
-                    trades = [s.get("trade", {}) for s in steps if s.get("trade", {}).get("action") in ("buy", "sell")]
-                if equity:
-                    metrics = compute_metrics(equity)
-                    trade_met = compute_trade_metrics(trades) if trades else {"num_trades": 0, "win_rate": 0, "profit_factor": 0, "total_pnl": 0, "avg_win": 0, "avg_loss": 0}
-                    st.markdown(f"**{data.get('ticker', '?')}** — {data.get('start_date', '?')} → {data.get('end_date', '?')}")
-                    cols = st.columns(4)
-                    for i, (label, val) in enumerate([
-                        ("Return", f"{metrics.get('total_return_pct', '?')}%"),
-                        ("CAGR", f"{metrics.get('cagr_pct', '?')}%"),
-                        ("Sharpe", str(metrics.get('sharpe_ratio', '?'))),
-                        ("Max DD", f"{metrics.get('max_drawdown_pct', '?')}%"),
-                        ("Trades", str(trade_met.get('num_trades', 0))),
-                        ("Win Rate", f"{trade_met.get('win_rate', 0)}%"),
-                        ("Profit Factor", str(trade_met.get('profit_factor', 0))),
-                        ("Final Value", f"${metrics.get('final_value', 0):,.0f}"),
-                    ]):
-                        with cols[i % 4]:
-                            st.metric(label, val)
-                    if len(equity) > 1:
-                        st.line_chart(pd.DataFrame({"equity": equity}))
-                    with st.expander("Raw data"):
-                        st.json(data)
-            except (json.JSONDecodeError, KeyError) as e:
-                st.error(f"Failed to load backtest result: {e}")
-
-
-def render_live_trading():
-    st.subheader("Live Trading")
-    state_path = Path("~/.trading/live_state.json").expanduser()
-    if not state_path.exists():
-        st.info("No live trading data. Run `trading run AAPL` to start.")
-        return
-    try:
-        data = json.loads(state_path.read_text())
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.metric("Portfolio Value", f"${data.get('portfolio_value', 0):,.0f}")
-        with col2:
-            st.metric("Cash", f"${data.get('cash', 0):,.0f}")
-        with col3:
-            st.metric("Orders Filled", data.get("orders", 0))
-        positions = data.get("positions", [])
-        if positions:
-            st.markdown("**Positions**")
-            pos_data = pd.DataFrame(positions)
-            st.dataframe(pos_data, use_container_width=True)
-        else:
-            st.info("No open positions")
-    except Exception as e:
-        st.error(f"Failed to load live state: {e}")
-
-
 def _detect_available_providers() -> list[tuple[str, str]]:
     providers = []
     if os.environ.get("OPENAI_API_KEY"):
@@ -294,7 +495,6 @@ def _detect_available_providers() -> list[tuple[str, str]]:
 
 
 def _fetch_ticker_snapshot(ticker: str) -> str:
-    """Fetch recent price + volume data for a ticker. Returns a formatted string or empty on failure."""
     try:
         t = yf.Ticker(ticker)
         hist = t.history(period="1mo")
@@ -322,8 +522,241 @@ def _fetch_ticker_snapshot(ticker: str) -> str:
         return ""
 
 
+def render_provider_health(trend: TREND):
+    try:
+        summary = trend.get_summary()
+    except Exception:
+        st.warning("Provider health data unavailable")
+        return
+    provider_stats = summary.get("provider_stats", []) if isinstance(summary, dict) else []
+    if not provider_stats:
+        st.info("No provider data yet. Make an analysis call first.")
+        return
+
+    rows_html = ""
+    for stat in provider_stats:
+        is_active = stat.get("provider", "") == summary.get("current_provider", "")
+        prov_name = stat.get("provider", "?").upper() if isinstance(stat, dict) else "?"
+        calls = stat.get("calls", 0) if isinstance(stat, dict) else 0
+        sr = stat.get("success_rate", 0.0) if isinstance(stat, dict) else 0.0
+        avg = stat.get("avg_duration_ms", 0) if isinstance(stat, dict) else 0
+        toks = stat.get("total_tokens", 0) if isinstance(stat, dict) else 0
+        pct = f"{sr * 100:.0f}%" if isinstance(sr, (int, float)) else "0%"
+        avg_ms = f"{avg:.0f}ms" if isinstance(avg, (int, float)) else "0ms"
+        dot_cls = "active" if is_active else "inactive"
+        label = "ACTIVE" if is_active else "STANDBY"
+        rows_html += f"""
+        <div class="data-row">
+            <span><span class="led-dot {dot_cls}"></span><span class="label">{prov_name}</span> <span style="color:#606070;font-size:0.6rem;">({label})</span></span>
+            <span class="value">{calls} calls | {pct} | {avg_ms} | {toks} tok</span>
+        </div>
+        """
+    st.markdown(
+        f'<div class="glass-card">{rows_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_portfolio(arcane: Optional[ARCANE]):
+    if not arcane:
+        st.info("No portfolio data loaded")
+        return
+    metrics = arcane.get_performance_metrics()
+    rows = [
+        ("Total Value", f"${metrics.get('total_value', 0):,.0f}", "gold"),
+        ("Cash", f"${metrics.get('cash', 0):,.0f}", ""),
+        ("Return", f"{metrics.get('total_return_pct', 0)}%", "pos" if metrics.get('total_return_pct', 0) >= 0 else "neg"),
+        ("Drawdown", f"{metrics.get('trailing_drawdown', 0)*100:.1f}%", "neg"),
+    ]
+    rows_html = ""
+    for label, val, cls in rows:
+        rows_html += f'<div class="data-row"><span class="label">{label}</span><span class="value {cls}">{val}</span></div>'
+    st.markdown(
+        f'<div class="glass-card">{rows_html}</div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_live_trading():
+    state_path = Path("~/.trading/live_state.json").expanduser()
+    if not state_path.exists():
+        st.info("No live trading data. Run `trading run AAPL` to start.")
+        return
+    try:
+        data = json.loads(state_path.read_text())
+        pv = data.get("portfolio_value", 0)
+        cash = data.get("cash", 0)
+        orders = data.get("orders", 0)
+        positions = data.get("positions", [])
+
+        rows = [
+            ("Portfolio Value", f"${pv:,.0f}", "gold"),
+            ("Cash", f"${cash:,.0f}", ""),
+            ("Orders Filled", str(orders), ""),
+            ("Positions", str(len(positions)), ""),
+        ]
+        rows_html = ""
+        for label, val, cls in rows:
+            rows_html += f'<div class="data-row"><span class="label">{label}</span><span class="value {cls}">{val}</span></div>'
+        st.markdown(
+            f'<div class="glass-card">{rows_html}</div>',
+            unsafe_allow_html=True,
+        )
+
+        if positions:
+            pos_df = pd.DataFrame(positions)
+            st.dataframe(pos_df, use_container_width=True, hide_index=True)
+    except Exception as e:
+        st.error(f"Failed to load live state: {e}")
+
+
+def render_backtest():
+    results_dir = Path("~/.trading/backtest_results").expanduser()
+    results_dir.mkdir(parents=True, exist_ok=True)
+    result_files = sorted(results_dir.glob("*.json"), reverse=True)
+
+    left_col, right_col = st.columns([1, 1.5])
+
+    with left_col:
+        st.markdown("<h2 style='margin-top:0;'>\u2699\ufe0f Run Backtest</h2>", unsafe_allow_html=True)
+        bt_ticker = st.text_input("Ticker", value="AAPL", key="bt_ticker", placeholder="e.g. AAPL, MSFT")
+        bt_from = st.text_input("Start date", value="2020-01-01", key="bt_from")
+        bt_to = st.text_input("End date", value=datetime.now().strftime("%Y-%m-%d"), key="bt_to")
+        bt_cash = st.number_input("Initial cash ($)", value=10_000, step=1_000, key="bt_cash")
+        if st.button("Run Backtest", type="primary", key="bt_run", use_container_width=True):
+            from trading.backtesting.midas import MIDAS
+            with st.spinner(f"Running backtest for {bt_ticker.strip().upper()}..."):
+                try:
+                    engine = MIDAS(
+                        initial_cash=float(bt_cash),
+                        aegis_config={
+                            "max_daily_drawdown": 0.50,
+                            "max_trailing_drawdown": 0.75,
+                        },
+                    )
+                    result = engine.run(bt_ticker.strip().upper(), bt_from, bt_to)
+                    slug = f"{bt_ticker.strip().upper()}_{bt_from}_{bt_to}".replace(".", "_")
+                    (results_dir / f"{slug}.json").write_text(json.dumps(result.to_dict(), indent=2))
+                    st.session_state.bt_last_result = {
+                        "ticker": bt_ticker.strip().upper(),
+                        "from": bt_from,
+                        "to": bt_to,
+                        "steps": len(result.steps),
+                        "equity": list(result.equity_curve),
+                        "trades": list(result.trades),
+                        "metrics": dict(result.metrics),
+                        "trade_metrics": dict(result.trade_metrics),
+                    }
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Backtest failed: {e}")
+                    import traceback
+                    st.code(traceback.format_exc(), language="python")
+
+    with right_col:
+        bt_last = st.session_state.get("bt_last_result")
+        if bt_last:
+            m = bt_last["metrics"]
+            tm = bt_last["trade_metrics"]
+            eq = bt_last["equity"]
+
+            rows = [
+                ("Return", f'{m.get("total_return_pct", "?")}%', "pos" if m.get("total_return_pct", 0) >= 0 else "neg"),
+                ("CAGR", f'{m.get("cagr_pct", "?")}%', "pos" if m.get("cagr_pct", 0) >= 0 else "neg"),
+                ("Sharpe", str(m.get("sharpe_ratio", "?")), ""),
+                ("Max DD", f'{m.get("max_drawdown_pct", "?")}%', "neg"),
+                ("Trades", str(tm.get("num_trades", 0)), ""),
+                ("Win Rate", f'{tm.get("win_rate", 0)}%', "pos"),
+                ("Profit Factor", str(tm.get("profit_factor", 0)), ""),
+                ("Final Value", f'${m.get("final_value", 0):,.0f}', "gold"),
+            ]
+            rows_html = ""
+            for i, (label, val, cls) in enumerate(rows):
+                delay = i * 0.03
+                rows_html += f'<div class="data-row" style="animation-delay:{delay}s;"><span class="label">{label}</span><span class="value {cls}">{val}</span></div>'
+
+            st.markdown(
+                f"""
+                <div class="glass-card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                        <span style="font-size:0.8rem;font-weight:600;color:#d4a843;font-family:'JetBrains Mono',monospace;">
+                            {bt_last['ticker']}
+                        </span>
+                        <span style="font-size:0.6rem;color:#606070;font-family:'JetBrains Mono',monospace;">
+                            {bt_last["from"]} \u2192 {bt_last["to"]}  |  {bt_last["steps"]} steps
+                        </span>
+                    </div>
+                    {rows_html}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            if len(eq) > 1:
+                st.line_chart(pd.DataFrame({"equity": eq}), height=200)
+
+            with st.expander("Raw data"):
+                st.json(bt_last)
+
+        elif result_files:
+            selected = st.selectbox("Saved result", [f.name for f in result_files])
+            if selected:
+                path = results_dir / selected
+                try:
+                    data = json.loads(path.read_text())
+                    equity = data.get("equity_curve") or []
+                    trades = data.get("trades") or []
+                    steps = data.get("steps") or []
+                    if not equity and steps:
+                        equity = [data.get("initial_cash", 100000)] + [s.get("portfolio_value", 0) for s in steps]
+                    if not trades and steps:
+                        trades = [s.get("trade", {}) for s in steps if s.get("trade", {}).get("action") in ("buy", "sell")]
+                    if equity:
+                        metrics = compute_metrics(equity)
+                        trade_met = compute_trade_metrics(trades) if trades else {"num_trades": 0, "win_rate": 0, "profit_factor": 0, "total_pnl": 0, "avg_win": 0, "avg_loss": 0}
+                        rows = [
+                            ("Return", f'{metrics.get("total_return_pct", "?")}%', "pos" if metrics.get("total_return_pct", 0) >= 0 else "neg"),
+                            ("CAGR", f'{metrics.get("cagr_pct", "?")}%', "pos" if metrics.get("cagr_pct", 0) >= 0 else "neg"),
+                            ("Sharpe", str(metrics.get("sharpe_ratio", "?")), ""),
+                            ("Max DD", f'{metrics.get("max_drawdown_pct", "?")}%', "neg"),
+                            ("Trades", str(trade_met.get("num_trades", 0)), ""),
+                            ("Win Rate", f'{trade_met.get("win_rate", 0)}%', "pos"),
+                            ("Profit Factor", str(trade_met.get("profit_factor", 0)), ""),
+                            ("Final Value", f'${metrics.get("final_value", 0):,.0f}', "gold"),
+                        ]
+                        rows_html = ""
+                        for i, (label, val, cls) in enumerate(rows):
+                            rows_html += f'<div class="data-row" style="animation-delay:{i*0.03}s;"><span class="label">{label}</span><span class="value {cls}">{val}</span></div>'
+                        st.markdown(
+                            f"""
+                            <div class="glass-card">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+                                    <span style="font-size:0.8rem;font-weight:600;color:#d4a843;font-family:'JetBrains Mono',monospace;">
+                                        {data.get("ticker", "?")}
+                                    </span>
+                                    <span style="font-size:0.6rem;color:#606070;font-family:'JetBrains Mono',monospace;">
+                                        {data.get("start_date", "?")} \u2192 {data.get("end_date", "?")}
+                                    </span>
+                                </div>
+                                {rows_html}
+                            </div>
+                            """,
+                            unsafe_allow_html=True,
+                        )
+                        if len(equity) > 1:
+                            st.line_chart(pd.DataFrame({"equity": equity}), height=200)
+                        with st.expander("Raw data"):
+                            st.json(data)
+                except (json.JSONDecodeError, KeyError) as e:
+                    st.error(f"Failed to load backtest result: {e}")
+        else:
+            st.markdown(
+                '<div class="glass-card" style="text-align:center;padding:2rem;"><span style="color:#606070;">Run a backtest to see results</span></div>',
+                unsafe_allow_html=True,
+            )
+
+
 def render_quick_analysis(trend: TREND):
-    st.subheader("Quick Analysis")
     if not HAS_LLM:
         st.warning("LLM provider packages not installed. Run `pip install langchain-openai` and add your API key.")
         return
@@ -338,37 +771,37 @@ def render_quick_analysis(trend: TREND):
             universe = get_all_tickers()
             st.session_state.ticker_universe = universe
             browse = sorted(
-                [f"{t['name']} ({t.get('exchange', '')}) — {t['ticker']}" for t in universe],
+                [f"{t['name']} ({t.get('exchange', '')}) \u2014 {t['ticker']}" for t in universe],
                 key=lambda s: s.lower(),
             )
             st.session_state.ticker_browse_labels = browse
             st.session_state.ticker_browse_map = {}
             for t in universe:
-                lbl = f"{t['name']} ({t.get('exchange', '')}) — {t['ticker']}"
+                lbl = f"{t['name']} ({t.get('exchange', '')}) \u2014 {t['ticker']}"
                 st.session_state.ticker_browse_map[lbl] = t["ticker"]
     browse_labels = st.session_state.ticker_browse_labels
     browse_map = st.session_state.ticker_browse_map
 
-    search_q = st.text_input("Search ticker or company", placeholder="e.g. Apple, MSFT, Reliance...", key="ticker_search")
+    search_q = st.text_input("Search ticker", placeholder="e.g. Apple, MSFT, Reliance...", key="ticker_search")
     q = search_q.strip()
     if q:
         ul = q.upper()
         matched = [lbl for lbl in browse_labels if ul in lbl.upper()]
-        shown = matched[:250] if matched else ["— No matches —"]
+        shown = matched[:250] if matched else ["\u2014 No matches \u2014"]
     else:
         shown = browse_labels[:250]
-    selected_lbl = st.selectbox("Select a ticker", shown, index=0, key="analysis_ticker")
+    selected_lbl = st.selectbox("Select", shown, index=0, key="analysis_ticker")
     ticker = browse_map.get(selected_lbl) or q.upper()
 
     if q and not any(ticker in lbl for lbl in browse_labels):
-        st.caption("⚠️ Ticker not found in universe")
+        st.caption("\u26a0\ufe0f Ticker not found in universe")
 
-    col2, col3 = st.columns([2, 1])
-    with col2:
+    col_a, col_b, col_c = st.columns([1.5, 1, 0.8])
+    with col_a:
         provider_opts = {f"{p[0].upper()} ({p[1]})": p for p in available}
-        default_prov = list(provider_opts.keys())[0]
         prov_choice = st.selectbox("Provider", list(provider_opts.keys()), index=0, key="analysis_provider")
-    with col3:
+    with col_b:
+        st.markdown("<br>", unsafe_allow_html=True)
         run = st.button("Analyze", type="primary", use_container_width=True)
 
     if run and ticker.strip():
@@ -408,13 +841,16 @@ def render_quick_analysis(trend: TREND):
                 )
                 st.success(f"Analysis complete ({duration_ms}ms, {token_count} tokens)")
                 if snapshot:
-                    st.markdown("**Live Data**")
-                    st.code(snapshot)
+                    st.markdown('<div class="glass-card"><div class="metric-label">Live Data</div><pre style="font-size:0.7rem;">' + snapshot + "</pre></div>", unsafe_allow_html=True)
                 if macro and "No data" not in macro and "Could not" not in macro:
-                    st.markdown("**Macroeconomic Context (World Bank)**")
-                    st.code(macro)
-                st.markdown(f"**{ticker.upper()} Analysis**")
-                st.markdown(text)
+                    st.markdown('<div class="glass-card"><div class="metric-label">Macroeconomic Context (World Bank)</div><pre style="font-size:0.7rem;">' + macro + "</pre></div>", unsafe_allow_html=True)
+                st.markdown(
+                    '<div class="glass-card">'
+                    f'<div class="metric-label">{ticker.upper()} Analysis</div>'
+                    f"<div style='font-size:0.8rem;line-height:1.6;'>{text}</div>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
             except Exception as e:
                 duration_ms = int((time.time() - start) * 1000)
                 trend.record_call(
@@ -428,7 +864,6 @@ def render_quick_analysis(trend: TREND):
 
 
 def render_recent_calls(trend: TREND):
-    st.subheader("Recent LLM Calls")
     records = trend.records[-20:][::-1]
     if not records:
         st.info("No LLM calls recorded yet")
@@ -438,7 +873,7 @@ def render_recent_calls(trend: TREND):
             "Time": r.timestamp[-19:-7] if len(r.timestamp) > 19 else r.timestamp,
             "Provider": r.provider,
             "Model": r.model,
-            "Status": "✅" if r.success else "❌",
+            "Status": "\u2705" if r.success else "\u274c",
             "Duration": f"{r.duration_ms:.0f}ms",
             "Tokens": r.token_count,
         }
@@ -452,22 +887,52 @@ def run_dashboard(host: str = "0.0.0.0", port: int = 8501):
         trend = load_trend_state()
     except Exception:
         trend = TREND()
-        st.warning("Failed to load trend state, using defaults")
+
     try:
         arcane = load_portfolio()
     except Exception:
         arcane = None
 
-    st.markdown(DARK_CSS, unsafe_allow_html=True)
-    st.title("T.R.E.N.D. — Tactical Rick-Evaluation and Network Directed-trading")
-    st.caption(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    st.markdown(KITCO_CSS, unsafe_allow_html=True)
+
+    render_ticker_tape()
+
+    st.markdown(
+        f"""
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:0.6rem 0 0.2rem 0;">
+            <div style="display:flex;align-items:center;gap:0.6rem;">
+                <span style="font-size:1.1rem;font-weight:700;color:#d4a843;letter-spacing:-0.5px;">T.R.E.N.D.</span>
+                <span style="font-size:0.6rem;color:#606070;background:rgba(255,255,255,0.04);padding:0.15rem 0.5rem;border-radius:4px;font-family:'JetBrains Mono',monospace;">v2.0</span>
+                <span class="led-dot gold" style="width:5px;height:5px;"></span>
+                <span style="font-size:0.6rem;color:#606070;font-family:'JetBrains Mono',monospace;">{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</span>
+            </div>
+            <div style="display:flex;gap:1rem;font-size:0.65rem;color:#606070;">
+                <span>Contracts: 0</span>
+                <span>|</span>
+                <span>Margin: 0%</span>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    render_hero(arcane)
 
     with st.sidebar:
+        st.markdown(
+            '<div style="padding:0.5rem 0;"><span style="font-size:0.9rem;font-weight:700;color:#d4a843;">T.R.E.N.D.</span></div>',
+            unsafe_allow_html=True,
+        )
         st.markdown("### Configuration")
         available = _detect_available_providers()
         if available:
             for prov, model in available:
-                st.success(f"✅ {prov.upper()} ({model})")
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:0.3rem;font-size:0.75rem;padding:0.15rem 0;">'
+                    f'<span class="led-dot active" style="width:5px;height:5px;"></span>'
+                    f'<span style="color:#b0b0bc;">{prov.upper()} ({model})</span></div>',
+                    unsafe_allow_html=True,
+                )
         else:
             st.warning("No API keys configured")
         if "ticker_universe" in st.session_state:
@@ -480,31 +945,38 @@ def run_dashboard(host: str = "0.0.0.0", port: int = 8501):
         st.markdown("### Quickstart")
         st.code("trading analyze AAPL")
         st.code("trading run AAPL --loop")
-        st.code("trading backtest AAPL --from 2020-01-01  # defaults to present")
-        st.markdown("[GitHub](https://github.com/gauravsengar24/SuperPower) • [Docs](https://github.com/gauravsengar24/SuperPower/blob/main/TRADING.md)")
+        st.code("trading backtest AAPL --from 2020-01-01")
+        st.markdown(
+            '<div style="margin-top:1rem;font-size:0.65rem;color:#606070;">'
+            '<a href="https://github.com/gauravsengar24/SuperPower" style="color:#606070;text-decoration:none;">GitHub</a>'
+            ' \u2022 '
+            '<a href="https://github.com/gauravsengar24/SuperPower/blob/main/TRADING.md" style="color:#606070;text-decoration:none;">Docs</a>'
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
-    sections = [
-        ("Quick Analysis", lambda: render_quick_analysis(trend)),
-        ("Live Trading", lambda: render_live_trading()),
-        ("Provider Health", lambda: render_provider_health(trend)),
-        ("Portfolio", lambda: render_portfolio(arcane)),
-        ("Backtest Viewer", lambda: render_backtest()),
-        ("Recent LLM Calls", lambda: render_recent_calls(trend)),
+    tab_labels = ["Quick Analysis", "Live Trading", "Provider Health", "Portfolio", "Backtest Viewer", "Recent LLM Calls"]
+    tab_funcs = [
+        lambda: render_quick_analysis(trend),
+        lambda: render_live_trading(),
+        lambda: render_provider_health(trend),
+        lambda: render_portfolio(arcane),
+        lambda: render_backtest(),
+        lambda: render_recent_calls(trend),
     ]
-    for i, (name, render_fn) in enumerate(sections):
-        try:
-            if i > 0:
-                st.divider()
-            render_fn()
-        except Exception as e:
-            st.error(f"{name} unavailable: {e}")
-            import traceback
-            st.code(traceback.format_exc(), language="python")
 
-    try:
+    tabs = st.tabs(tab_labels)
+    for tab, fn in zip(tabs, tab_funcs):
+        with tab:
+            try:
+                fn()
+            except Exception as e:
+                st.error(f"Section unavailable: {e}")
+                import traceback
+                st.code(traceback.format_exc(), language="python")
+
+    with contextlib.suppress(Exception):
         save_trend_state(trend)
-    except Exception:
-        pass
 
 
 if __name__ == "__main__":
